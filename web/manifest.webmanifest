@@ -1,0 +1,19 @@
+{
+  "name": "SpeakEasy",
+  "short_name": "SpeakEasy",
+  "start_url": "/speakeasy/",
+  "scope": "/speakeasy/",
+  "display": "standalone",
+  "background_color": "#080a0e",
+  "theme_color": "#080a0e",
+  "description": "SpeakEasy — your voice, your words, instantly.",
+  "icons": [
+    {
+      "src": "/assets/wake-emblem-original.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
+

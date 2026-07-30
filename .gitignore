@@ -1,0 +1,33 @@
+# Dependencies
+node_modules/
+
+# Android / Gradle
+**/.gradle/
+**/build/
+**/local.properties
+**/*.iml
+**/.idea/
+
+# Build artifacts
+*.apk
+*.aab
+*.ap_
+*.aar
+*.dex
+
+# Signing — never commit
+**/*.keystore
+**/*.jks
+**/keystore/
+**/keystore.properties
+
+# Logs / OS
+*.log
+.DS_Store
+Thumbs.db
+
+# Env / secrets
+.env
+.env.*
+*.pem
+WAKE_KEYS/
