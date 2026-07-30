@@ -3,7 +3,8 @@
 Canonical public repo: https://github.com/justinevans4040-cloud/speakeasy  
 Local workspace: `C:\Users\justi\speakeasy`  
 Android package: `com.wakeforged.speakeasy`  
-Live URL loaded by mobile shell: `https://www.wakeforged.com/speakeasy/`
+**Runtime:** bundled local `web/` → `mobile/www` (no remote host).  
+Former remote URL `https://www.wakeforged.com/speakeasy/` was packaging leftover and has been removed from Capacitor.
 
 This file maps every SpeakEasy location found on the Lenovo / Drive mirror. **No secrets are stored here.**
 
@@ -86,7 +87,7 @@ Builds are **not** committed to the public GitHub repo (by design).
 1. **GoogleDrive public `speakeasy` is missing `index.html`** and has older `sw.js` / manifest than the GitHub `web/` extract — sync or replace from `C:\Users\justi\speakeasy\web\` if Drive is still used as a mirror.
 2. **No separate Drive “web” / “Android” folders** found outside wakecodex on this PC; if those cloud folders still exist online-only, open them in Drive and confirm share state.
 3. **Copy signing material to a stable Lenovo path** (optional): e.g. recreate `WAKE_KEYS` on Desktop/OneDrive and point builds at it — current live keystore is under `GoogleDrive\wakecodex\...`.
-4. **Transcription engine:** no separate offline engine package found under SpeakEasy names; mobile shell is remote-first to wakeforged.com. If an offline engine exists only off-machine, it is still unverified.
+4. **Transcription engine:** no separate offline engine package found under SpeakEasy names. App UI is self-contained in `web/`; any cloud STT would be a later integration.
 
 ---
 
@@ -95,7 +96,7 @@ Builds are **not** committed to the public GitHub repo (by design).
 ```
 GitHub public ........ justinevans4040-cloud/speakeasy   ← canonical source
 Lenovo workspace ..... C:\Users\justi\speakeasy
-Live site ............ https://www.wakeforged.com/speakeasy/
+Runtime .............. bundled web/ (no Netlify / no wakeforged.com required)
 APK/AAB .............. GoogleDrive wakecodex downloads + Gradle outputs (same hashes)
 Signing .............. GoogleDrive wakecodex keystore + WAKE_DOCS WAKE_KEYS note
 Still inside wakecodex  GoogleDrive + Desktop\_TEMP_PULLS copies (legacy nest)

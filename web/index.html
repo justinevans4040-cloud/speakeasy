@@ -4,11 +4,11 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>SpeakEasy — Your Voice. Your Words. Instantly.</title>
-<link rel="manifest" href="/speakeasy/manifest.webmanifest">
+<link rel="manifest" href="./manifest.webmanifest">
 <meta name="theme-color" content="#080a0e">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<link rel="apple-touch-icon" href="/assets/wake-emblem-original.png">
+<link rel="apple-touch-icon" href="./assets/wake-emblem-original.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,900;1,700&family=DM+Sans:wght@300;400;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
@@ -739,13 +739,13 @@ footer{padding:60px 5% 32px;border-top:1px solid var(--border);background:var(--
     <h2 class="section-title">Your Voice Is the<br>Fastest Tool You Own.</h2>
     <p class="section-sub">Stop leaving productivity on the table. SpeakEasy is free to try, takes 60 seconds to install, and requires zero training to start using right now.</p>
     <div class="cta-actions">
-      <a href="/downloads/speakeasy/SpeakEasy-Android.apk" class="btn-primary" style="padding:17px 36px;font-size:1rem">
+      <a href="#demo" class="btn-primary" style="padding:17px 36px;font-size:1rem">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 1a4 4 0 0 1 4 4v7a4 4 0 0 1-8 0V5a4 4 0 0 1 4-4zm7 10a1 1 0 0 1 1 1 8 8 0 0 1-7 7.94V21h2a1 1 0 0 1 0 2H9a1 1 0 0 1 0-2h2v-1.06A8 8 0 0 1 4 12a1 1 0 0 1 2 0 6 6 0 0 0 12 0 1 1 0 0 1 1-1z"/></svg>
-        Download Android App (APK)
+        Open SpeakEasy Demo
       </a>
-      <a href="#demo" class="btn-secondary" style="padding:17px 36px;font-size:1rem">Watch 90-Second Demo</a>
+      <a href="#features" class="btn-secondary" style="padding:17px 36px;font-size:1rem">See Features</a>
     </div>
-    <div class="cta-note">Android download + web install · iOS install via Safari → Add to Home Screen</div>
+    <div class="cta-note">Standalone app · works offline from this package · iOS: Safari → Add to Home Screen</div>
   </div>
 </section>
 
@@ -876,7 +876,7 @@ setTimeout(typeLoop,1200);
   (function () {
     if (!("serviceWorker" in navigator)) return;
     window.addEventListener("load", function () {
-      navigator.serviceWorker.register("/speakeasy/sw.js", { scope: "/speakeasy/" }).catch(function () {});
+      navigator.serviceWorker.register("./sw.js", { scope: "./" }).catch(function () {});
     });
   })();
 </script>

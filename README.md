@@ -1,37 +1,35 @@
 # SpeakEasy
 
-WakeForged SpeakEasy — web PWA + Android Capacitor shell.
+Standalone SpeakEasy — web PWA + Android Capacitor shell.
 
-**Live site:** https://www.wakeforged.com/speakeasy/  
-**Android package:** `com.wakeforged.speakeasy`
+**Android package:** `com.wakeforged.speakeasy` (Play identity; not tied to wakeforged.com hosting)
 
 ## Layout
 
 | Path | What |
 |------|------|
-| `web/` | PWA (`index.html`, `sw.js`, `manifest.webmanifest`) — live copy served at `/speakeasy/` |
-| `mobile/` | Capacitor Android wrapper; loads the live site URL |
+| `web/` | Standalone PWA (source of truth) |
+| `mobile/` | Capacitor Android shell — loads **bundled** `www/` (copied from `web/`) |
 | `templates/speakeasy_landing.html` | Original template — do not edit |
-| `docs/SPEAKEASY_MOBILE_RELEASE_MANUAL.md` | Release / Play Store notes |
-| `docs/INVENTORY.md` | Where every SpeakEasy copy lives (GitHub / Drive / Lenovo) |
+| `docs/SPEAKEASY_MOBILE_RELEASE_MANUAL.md` | Release notes |
+| `docs/INVENTORY.md` | Where copies live on disk |
 
-## Mobile shell
-
-The Android app is a remote-first wrapper. It loads:
-
-`https://www.wakeforged.com/speakeasy/`
+## Run locally (no Netlify / no wakeforged.com)
 
 ```bash
+# Browser
+start web/index.html
+
+# Android (bundled local web)
 cd mobile
 npm install
 npm run sync
-npm run build:apk   # or build:aab
+npm run android
+# or: npm run build:apk
 ```
 
-## Signing (local only)
-
-Upload keystore and `keystore.properties` stay **off** this repo. Keep them on the Lenovo under the mobile Android tree / `WAKE_KEYS` as documented in the release manual.
+Capacitor no longer points at `https://www.wakeforged.com/speakeasy/`. The app ships its own HTML.
 
 ## Origin
 
-Extracted from `justinevans4040-cloud/wakecodex` so SpeakEasy has its own public home.
+Extracted from `wakecodex` packaging. Hosting leftovers on wakeforged/Netlify are not required to run SpeakEasy.
