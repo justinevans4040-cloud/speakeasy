@@ -13,6 +13,7 @@ WakeForged SpeakEasy — web PWA + Android Capacitor shell.
 | `mobile/` | Capacitor Android wrapper; loads the live site URL |
 | `templates/speakeasy_landing.html` | Original template — do not edit |
 | `docs/SPEAKEASY_MOBILE_RELEASE_MANUAL.md` | Release / Play Store notes |
+| `docs/INVENTORY.md` | Where every SpeakEasy copy lives (GitHub / Drive / Lenovo) |
 
 ## Mobile shell
 

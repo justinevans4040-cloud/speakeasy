@@ -37,7 +37,10 @@ Notes:
 
 - Keystore: `mobile/android/keystore/speakeasy-upload.keystore`
 - Properties: `mobile/android/keystore.properties`
-- Credentials note (local): `C:\Users\justi\OneDrive\Desktop\WAKE_KEYS\SpeakEasy_android_upload_key.txt`
+- Credentials note (local, verified): `C:\Users\justi\WAKE_DOCS\Documentation\WakeSystems\consolidated\wake_systems\desktop_sweep_20260512_140911\WAKE_KEYS\SpeakEasy_android_upload_key.txt`
+- Old documented path (missing on Lenovo): `C:\Users\justi\OneDrive\Desktop\WAKE_KEYS\SpeakEasy_android_upload_key.txt`
+- Live keystore on this machine: `C:\Users\justi\GoogleDrive\wakecodex\apps\speakeasy-mobile\android\keystore\` + `keystore.properties`
+- Full location map: `docs/INVENTORY.md`
 
 ## Step 3 — Apple App Store (iOS)
 
