@@ -43,15 +43,15 @@ body {
   line-height: 1.5;
   overflow: hidden;
 }
-button, select { font: inherit; color: inherit; }
+button { font: inherit; color: inherit; }
 .app {
   height: 100%;
   max-width: 720px;
   margin: 0 auto;
   display: grid;
-  grid-template-rows: auto 1fr auto;
+  grid-template-rows: auto auto 1fr auto;
   padding: calc(16px + var(--safe-t)) 18px calc(16px + var(--safe-b));
-  gap: 14px;
+  gap: 12px;
 }
 .top {
   display: flex;
@@ -91,7 +91,33 @@ button, select { font: inherit; color: inherit; }
 }
 .status.live { color: var(--teal); border-color: rgba(0,212,200,0.35); background: var(--teal-soft); }
 .status.err { color: var(--danger); border-color: rgba(255,71,87,0.35); }
-
+.load {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  padding: 10px 12px;
+}
+.load-label {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+.load-track {
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.06);
+  overflow: hidden;
+}
+.load-bar {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, var(--teal2), var(--teal));
+  transition: width .2s ease;
+}
 .panel {
   min-height: 0;
   display: flex;
@@ -108,27 +134,17 @@ button, select { font: inherit; color: inherit; }
   padding: 12px;
   border-bottom: 1px solid var(--border);
   align-items: center;
+  justify-content: space-between;
 }
-.toolbar select {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 8px 10px;
-  min-width: 0;
-  flex: 1 1 160px;
+.toolbar .note {
+  font-size: 0.78rem;
+  color: var(--muted);
 }
-.chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 10px;
-  border-radius: 10px;
-  border: 1px solid var(--border);
-  background: var(--surface);
-  cursor: pointer;
-  user-select: none;
+a.landing {
+  color: var(--teal);
+  text-decoration: none;
+  font-size: 0.8rem;
 }
-.chip input { accent-color: var(--teal); }
 .transcript {
   flex: 1;
   min-height: 0;
@@ -154,7 +170,6 @@ button, select { font: inherit; color: inherit; }
   justify-content: space-between;
   gap: 10px;
 }
-
 .controls {
   display: grid;
   grid-template-columns: 1fr auto 1fr;
@@ -175,10 +190,8 @@ button, select { font: inherit; color: inherit; }
   border-radius: 12px;
   padding: 10px 12px;
   cursor: pointer;
-  transition: border-color .15s, background .15s, transform .1s;
 }
 .btn:hover { border-color: rgba(0,212,200,0.35); }
-.btn:active { transform: scale(0.98); }
 .btn:disabled { opacity: 0.4; cursor: not-allowed; }
 .mic-wrap { display: grid; place-items: center; position: relative; }
 .mic {
@@ -192,10 +205,8 @@ button, select { font: inherit; color: inherit; }
   box-shadow: 0 0 0 0 rgba(0,212,200,0.35), 0 18px 40px rgba(0,0,0,0.45);
   display: grid;
   place-items: center;
-  transition: transform .15s, box-shadow .2s;
 }
 .mic svg { width: 34px; height: 34px; }
-.mic:hover { transform: translateY(-1px); }
 .mic.listening {
   animation: pulse 1.4s ease-out infinite;
   background: radial-gradient(circle at 35% 30%, #ff8a95, var(--danger) 55%, #b91c1c);
@@ -226,22 +237,6 @@ button, select { font: inherit; color: inherit; }
   font-size: 0.8rem;
   color: var(--muted);
 }
-.unsupported {
-  margin: auto;
-  max-width: 420px;
-  text-align: center;
-  padding: 28px 18px;
-  border: 1px solid var(--border);
-  border-radius: 16px;
-  background: var(--card);
-}
-.unsupported h2 { font-family: var(--font-display); color: var(--cream); margin-bottom: 8px; }
-.unsupported p { color: var(--muted); }
-a.landing {
-  color: var(--teal);
-  text-decoration: none;
-  font-size: 0.8rem;
-}
 </style>
 </head>
 <body>
@@ -254,17 +249,23 @@ a.landing {
     <div class="status" id="status">Ready</div>
   </header>
 
+  <div class="load" id="loadWrap" hidden>
+    <div class="load-label">
+      <span>Loading on-device engine</span>
+      <span id="engineLabel">Whisper…</span>
+    </div>
+    <div class="load-track"><div class="load-bar" id="loadBar"></div></div>
+  </div>
+
   <section class="panel" aria-label="Transcript">
     <div class="toolbar">
-      <select id="lang" aria-label="Language"></select>
-      <label class="chip"><input type="checkbox" id="continuous" checked> Continuous</label>
-      <label class="chip"><input type="checkbox" id="interim" checked> Live words</label>
+      <span class="note">English · on-device Whisper (no Netlify)</span>
       <a class="landing" href="./landing.html">Marketing page</a>
     </div>
     <div class="transcript" id="transcript" contenteditable="true" spellcheck="true" role="textbox" aria-multiline="true" aria-label="Transcript editor"></div>
     <div class="meta">
       <span id="wordCount">0 words</span>
-      <span id="engineLabel">Web Speech</span>
+      <span id="engineLabelMeta">Whisper tiny.en</span>
     </div>
   </section>
 
@@ -283,311 +284,14 @@ a.landing {
       <button class="btn" id="btnSave" type="button">Save .txt</button>
       <button class="btn" id="btnStop" type="button" disabled>Stop</button>
     </div>
-    <p class="hint" id="hint">Hold focus in the transcript to edit. Mic uses on-device speech recognition when available.</p>
+    <p class="hint" id="hint">First run downloads a small model (~40MB), then caches it. Keep talking — it chunks on pauses.</p>
   </footer>
 </div>
 
-<script>
-(function () {
-  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-  const statusEl = document.getElementById("status");
-  const transcriptEl = document.getElementById("transcript");
-  const wordCountEl = document.getElementById("wordCount");
-  const langEl = document.getElementById("lang");
-  const continuousEl = document.getElementById("continuous");
-  const interimEl = document.getElementById("interim");
-  const btnMic = document.getElementById("btnMic");
-  const btnStop = document.getElementById("btnStop");
-  const btnCopy = document.getElementById("btnCopy");
-  const btnClear = document.getElementById("btnClear");
-  const btnSave = document.getElementById("btnSave");
-  const hintEl = document.getElementById("hint");
+<!-- kept for compatibility -->
+<select id="lang" hidden></select>
+<select id="mode" hidden></select>
 
-  let recognition = null;
-  let listening = false;
-  let wantListen = false;
-  let finalText = "";
-  let restartTimer = null;
-  let startLock = false;
-
-  const langs = [
-    ["en-US", "English (US)"],
-    ["en-GB", "English (UK)"],
-    ["es-ES", "Spanish"],
-    ["fr-FR", "French"],
-    ["de-DE", "German"],
-    ["pt-BR", "Portuguese (BR)"],
-    ["it-IT", "Italian"],
-    ["ja-JP", "Japanese"],
-    ["zh-CN", "Chinese (Simplified)"],
-  ];
-  for (const [code, label] of langs) {
-    const opt = document.createElement("option");
-    opt.value = code;
-    opt.textContent = label;
-    langEl.appendChild(opt);
-  }
-  const savedLang = localStorage.getItem("speakeasy.lang");
-  if (savedLang) langEl.value = savedLang;
-
-  function setStatus(text, mode) {
-    statusEl.textContent = text;
-    statusEl.classList.toggle("live", mode === "live");
-    statusEl.classList.toggle("err", mode === "err");
-  }
-
-  function countWords(text) {
-    const t = text.trim();
-    if (!t) return 0;
-    return t.split(/\s+/).length;
-  }
-
-  function render(interim) {
-    const plain = finalText + (interim ? (finalText && !/\s$/.test(finalText) ? " " : "") + interim : "");
-    if (document.activeElement === transcriptEl && !wantListen) {
-      wordCountEl.textContent = countWords(transcriptEl.innerText) + " words";
-      return;
-    }
-    const interimHtml = interim
-      ? '<span class="interim">' + escapeHtml(interim) + "</span>"
-      : "";
-    transcriptEl.innerHTML = escapeHtml(finalText) + (interim ? (finalText ? " " : "") + interimHtml : "");
-    wordCountEl.textContent = countWords(plain) + " words";
-    transcriptEl.scrollTop = transcriptEl.scrollHeight;
-  }
-
-  function escapeHtml(s) {
-    return s
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;");
-  }
-
-  function syncFinalFromEditor() {
-    finalText = transcriptEl.innerText.replace(/\u00a0/g, " ");
-  }
-
-  function setListeningUi(on) {
-    listening = on;
-    btnMic.classList.toggle("listening", on);
-    btnMic.setAttribute("aria-pressed", on ? "true" : "false");
-    btnMic.setAttribute("aria-label", on ? "Stop listening" : "Start listening");
-    btnStop.disabled = !on;
-    if (on) {
-      setStatus("Listening", "live");
-      hintEl.textContent = "Listening… Chrome cuts sessions short — SpeakEasy auto-restarts until you hit Stop.";
-    } else {
-      setStatus("Ready");
-      hintEl.textContent = "Hold focus in the transcript to edit. Mic uses speech recognition when available.";
-    }
-  }
-
-  function unsupported() {
-    document.getElementById("app").innerHTML =
-      '<div class="unsupported"><h2>SpeakEasy</h2><p>This browser cannot use speech recognition. Open in Chrome or Edge on desktop, or the Android app WebView.</p></div>';
-  }
-
-  if (!SpeechRecognition) {
-    unsupported();
-    return;
-  }
-
-  function clearRestart() {
-    if (restartTimer) {
-      clearTimeout(restartTimer);
-      restartTimer = null;
-    }
-  }
-
-  function scheduleRestart(delayMs) {
-    clearRestart();
-    restartTimer = setTimeout(function () {
-      restartTimer = null;
-      if (!wantListen) return;
-      beginSession();
-    }, delayMs);
-  }
-
-  function appendFinal(chunk) {
-    const text = String(chunk || "").trim();
-    if (!text) return;
-    if (!finalText) {
-      finalText = text;
-      return;
-    }
-    const needsSpace = !/\s$/.test(finalText) && !/^[,.;:!?]/.test(text);
-    finalText += (needsSpace ? " " : "") + text;
-  }
-
-  function beginSession() {
-    if (!wantListen || startLock) return;
-    startLock = true;
-    clearRestart();
-    syncFinalFromEditor();
-
-    // Chrome requires a NEW SpeechRecognition instance after every onend.
-    if (recognition) {
-      recognition.onstart = null;
-      recognition.onerror = null;
-      recognition.onend = null;
-      recognition.onresult = null;
-      try { recognition.abort(); } catch (_) {}
-      recognition = null;
-    }
-
-    const rec = new SpeechRecognition();
-    recognition = rec;
-    rec.lang = langEl.value || "en-US";
-    // Always continuous while user wants listen — checkbox only affects auto-restart aggressiveness UX
-    rec.continuous = true;
-    rec.interimResults = !!interimEl.checked;
-    rec.maxAlternatives = 1;
-
-    rec.onstart = function () {
-      startLock = false;
-      setListeningUi(true);
-    };
-
-    rec.onresult = function (event) {
-      let interim = "";
-      for (let i = event.resultIndex; i < event.results.length; i++) {
-        const result = event.results[i];
-        const text = result[0] && result[0].transcript ? result[0].transcript : "";
-        if (result.isFinal) appendFinal(text);
-        else interim += text;
-      }
-      render(interim.trim());
-    };
-
-    rec.onerror = function (event) {
-      const err = event.error || "error";
-      // Soft errors: keep wanting listen and restart
-      if (err === "no-speech" || err === "aborted" || err === "network" || err === "service-not-allowed") {
-        if (err === "network") setStatus("Reconnecting…", "live");
-        return;
-      }
-      if (err === "not-allowed") {
-        wantListen = false;
-        startLock = false;
-        clearRestart();
-        setListeningUi(false);
-        setStatus("Mic blocked", "err");
-        hintEl.textContent = "Microphone permission denied. Allow mic access and try again.";
-        return;
-      }
-      setStatus(err, "err");
-    };
-
-    rec.onend = function () {
-      startLock = false;
-      listening = false;
-      render("");
-      if (!wantListen) {
-        setListeningUi(false);
-        return;
-      }
-      // Keep red mic state while we bounce the session
-      btnMic.classList.add("listening");
-      btnStop.disabled = false;
-      setStatus("Listening", "live");
-      // Fresh instance after a beat — reusing the same object dies after ~one phrase in Chrome
-      scheduleRestart(continuousEl.checked ? 120 : 250);
-    };
-
-    try {
-      rec.start();
-    } catch (e) {
-      startLock = false;
-      if (wantListen) scheduleRestart(300);
-      else {
-        setStatus("Start failed", "err");
-        hintEl.textContent = String(e && e.message ? e.message : e);
-      }
-    }
-  }
-
-  function startListening() {
-    wantListen = true;
-    setListeningUi(true);
-    beginSession();
-  }
-
-  function stopListening() {
-    wantListen = false;
-    clearRestart();
-    startLock = false;
-    if (recognition) {
-      try { recognition.stop(); } catch (_) {
-        try { recognition.abort(); } catch (__) {}
-      }
-    }
-    setListeningUi(false);
-  }
-
-  btnMic.addEventListener("click", function () {
-    if (wantListen) stopListening();
-    else startListening();
-  });
-  btnStop.addEventListener("click", function () { stopListening(); });
-
-  langEl.addEventListener("change", function () {
-    localStorage.setItem("speakeasy.lang", langEl.value);
-    if (wantListen) beginSession();
-  });
-  continuousEl.addEventListener("change", function () {
-    // no hard restart required; applies on next session bounce
-  });
-  interimEl.addEventListener("change", function () {
-    if (wantListen) beginSession();
-  });
-
-  btnCopy.addEventListener("click", async function () {
-    syncFinalFromEditor();
-    const text = transcriptEl.innerText.trim();
-    try {
-      await navigator.clipboard.writeText(text);
-      setStatus("Copied");
-      setTimeout(function () { if (!wantListen) setStatus("Ready"); }, 900);
-    } catch (_) {
-      setStatus("Copy failed", "err");
-    }
-  });
-
-  btnClear.addEventListener("click", function () {
-    finalText = "";
-    transcriptEl.innerHTML = "";
-    wordCountEl.textContent = "0 words";
-    setStatus("Cleared");
-    setTimeout(function () { if (!wantListen) setStatus("Ready"); }, 700);
-  });
-
-  btnSave.addEventListener("click", function () {
-    syncFinalFromEditor();
-    const text = transcriptEl.innerText.trim();
-    const blob = new Blob([text + "\n"], { type: "text/plain;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
-    a.href = url;
-    a.download = "speakeasy-" + stamp + ".txt";
-    a.click();
-    URL.revokeObjectURL(url);
-  });
-
-  transcriptEl.addEventListener("input", function () {
-    if (!wantListen) {
-      finalText = transcriptEl.innerText;
-      wordCountEl.textContent = countWords(finalText) + " words";
-    }
-  });
-
-  if ("serviceWorker" in navigator) {
-    window.addEventListener("load", function () {
-      navigator.serviceWorker.register("./sw.js", { scope: "./" }).catch(function () {});
-    });
-  }
-})();
-</script>
+<script type="module" src="./app.js"></script>
 </body>
 </html>

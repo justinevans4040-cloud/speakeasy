@@ -1,8 +1,9 @@
-const CACHE_NAME = "speakeasy-app-v2";
+const CACHE_NAME = "speakeasy-app-v3";
 
 const ASSETS = [
   "./",
   "./index.html",
+  "./app.js",
   "./landing.html",
   "./manifest.webmanifest",
   "./assets/wake-emblem-original.png",
@@ -24,6 +25,9 @@ self.addEventListener("activate", (event) => {
 self.addEventListener("fetch", (event) => {
   const { request } = event;
   if (request.method !== "GET") return;
+  const url = new URL(request.url);
+  // Don't SW-cache the model CDN — transformers has its own cache
+  if (url.hostname.includes("jsdelivr") || url.hostname.includes("huggingface")) return;
 
   event.respondWith(
     caches.match(request).then((cached) => {
@@ -31,7 +35,6 @@ self.addEventListener("fetch", (event) => {
       return fetch(request)
         .then((res) => {
           try {
-            const url = new URL(request.url);
             if (url.origin === self.location.origin) {
               const clone = res.clone();
               caches.open(CACHE_NAME).then((cache) => cache.put(request, clone)).catch(() => {});
