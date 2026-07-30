@@ -305,8 +305,10 @@ a.landing {
 
   let recognition = null;
   let listening = false;
+  let wantListen = false;
   let finalText = "";
-  let restarting = false;
+  let restartTimer = null;
+  let startLock = false;
 
   const langs = [
     ["en-US", "English (US)"],
@@ -341,15 +343,14 @@ a.landing {
   }
 
   function render(interim) {
-    const interimHtml = interim
-      ? '<span class="interim">' + escapeHtml(interim) + "</span>"
-      : "";
-    // Keep caret friendly: only rewrite when not focused editing mid-stream final block
     const plain = finalText + (interim ? (finalText && !/\s$/.test(finalText) ? " " : "") + interim : "");
-    if (document.activeElement === transcriptEl && !listening) {
+    if (document.activeElement === transcriptEl && !wantListen) {
       wordCountEl.textContent = countWords(transcriptEl.innerText) + " words";
       return;
     }
+    const interimHtml = interim
+      ? '<span class="interim">' + escapeHtml(interim) + "</span>"
+      : "";
     transcriptEl.innerHTML = escapeHtml(finalText) + (interim ? (finalText ? " " : "") + interimHtml : "");
     wordCountEl.textContent = countWords(plain) + " words";
     transcriptEl.scrollTop = transcriptEl.scrollHeight;
@@ -364,8 +365,22 @@ a.landing {
   }
 
   function syncFinalFromEditor() {
-    // Strip interim spans if user edited
     finalText = transcriptEl.innerText.replace(/\u00a0/g, " ");
+  }
+
+  function setListeningUi(on) {
+    listening = on;
+    btnMic.classList.toggle("listening", on);
+    btnMic.setAttribute("aria-pressed", on ? "true" : "false");
+    btnMic.setAttribute("aria-label", on ? "Stop listening" : "Start listening");
+    btnStop.disabled = !on;
+    if (on) {
+      setStatus("Listening", "live");
+      hintEl.textContent = "Listening… Chrome cuts sessions short — SpeakEasy auto-restarts until you hit Stop.";
+    } else {
+      setStatus("Ready");
+      hintEl.textContent = "Hold focus in the transcript to edit. Mic uses speech recognition when available.";
+    }
   }
 
   function unsupported() {
@@ -378,132 +393,153 @@ a.landing {
     return;
   }
 
-  function createRecognition() {
+  function clearRestart() {
+    if (restartTimer) {
+      clearTimeout(restartTimer);
+      restartTimer = null;
+    }
+  }
+
+  function scheduleRestart(delayMs) {
+    clearRestart();
+    restartTimer = setTimeout(function () {
+      restartTimer = null;
+      if (!wantListen) return;
+      beginSession();
+    }, delayMs);
+  }
+
+  function appendFinal(chunk) {
+    const text = String(chunk || "").trim();
+    if (!text) return;
+    if (!finalText) {
+      finalText = text;
+      return;
+    }
+    const needsSpace = !/\s$/.test(finalText) && !/^[,.;:!?]/.test(text);
+    finalText += (needsSpace ? " " : "") + text;
+  }
+
+  function beginSession() {
+    if (!wantListen || startLock) return;
+    startLock = true;
+    clearRestart();
+    syncFinalFromEditor();
+
+    // Chrome requires a NEW SpeechRecognition instance after every onend.
+    if (recognition) {
+      recognition.onstart = null;
+      recognition.onerror = null;
+      recognition.onend = null;
+      recognition.onresult = null;
+      try { recognition.abort(); } catch (_) {}
+      recognition = null;
+    }
+
     const rec = new SpeechRecognition();
+    recognition = rec;
     rec.lang = langEl.value || "en-US";
-    rec.continuous = !!continuousEl.checked;
+    // Always continuous while user wants listen — checkbox only affects auto-restart aggressiveness UX
+    rec.continuous = true;
     rec.interimResults = !!interimEl.checked;
     rec.maxAlternatives = 1;
 
     rec.onstart = function () {
-      listening = true;
-      restarting = false;
-      btnMic.classList.add("listening");
-      btnMic.setAttribute("aria-pressed", "true");
-      btnMic.setAttribute("aria-label", "Stop listening");
-      btnStop.disabled = false;
-      setStatus("Listening", "live");
-      hintEl.textContent = "Listening… speak naturally. Tap the mic or Stop when done.";
-    };
-
-    rec.onerror = function (event) {
-      const err = event.error || "error";
-      if (err === "aborted" || err === "no-speech") {
-        setStatus(err === "no-speech" ? "No speech" : "Ready");
-        return;
-      }
-      if (err === "not-allowed") {
-        setStatus("Mic blocked", "err");
-        hintEl.textContent = "Microphone permission denied. Allow mic access and try again.";
-        stopListening(false);
-        return;
-      }
-      setStatus(err, "err");
-    };
-
-    rec.onend = function () {
-      listening = false;
-      btnMic.classList.remove("listening");
-      btnMic.setAttribute("aria-pressed", "false");
-      btnMic.setAttribute("aria-label", "Start listening");
-      btnStop.disabled = true;
-      render("");
-      if (restarting) {
-        restarting = false;
-        startListening();
-        return;
-      }
-      if (continuousEl.checked && recognition === rec && btnMic.dataset.want === "1") {
-        // Chrome ends continuous sessions periodically — auto-resume while user wants listening
-        try { rec.start(); } catch (_) { setStatus("Ready"); btnMic.dataset.want = "0"; }
-        return;
-      }
-      btnMic.dataset.want = "0";
-      setStatus("Ready");
-      hintEl.textContent = "Hold focus in the transcript to edit. Mic uses on-device speech recognition when available.";
+      startLock = false;
+      setListeningUi(true);
     };
 
     rec.onresult = function (event) {
       let interim = "";
       for (let i = event.resultIndex; i < event.results.length; i++) {
         const result = event.results[i];
-        const text = result[0].transcript;
-        if (result.isFinal) {
-          finalText = (finalText + (finalText && !/\s$/.test(finalText) ? " " : "") + text.trim()).replace(/\s+/g, " ");
-          if (finalText && !/[.!?]$/.test(finalText)) {
-            // keep flowing; user can punctuate by voice ("question mark") on supporting engines
-          }
-          interim = "";
-        } else {
-          interim += text;
-        }
+        const text = result[0] && result[0].transcript ? result[0].transcript : "";
+        if (result.isFinal) appendFinal(text);
+        else interim += text;
       }
       render(interim.trim());
     };
 
-    return rec;
+    rec.onerror = function (event) {
+      const err = event.error || "error";
+      // Soft errors: keep wanting listen and restart
+      if (err === "no-speech" || err === "aborted" || err === "network" || err === "service-not-allowed") {
+        if (err === "network") setStatus("Reconnecting…", "live");
+        return;
+      }
+      if (err === "not-allowed") {
+        wantListen = false;
+        startLock = false;
+        clearRestart();
+        setListeningUi(false);
+        setStatus("Mic blocked", "err");
+        hintEl.textContent = "Microphone permission denied. Allow mic access and try again.";
+        return;
+      }
+      setStatus(err, "err");
+    };
+
+    rec.onend = function () {
+      startLock = false;
+      listening = false;
+      render("");
+      if (!wantListen) {
+        setListeningUi(false);
+        return;
+      }
+      // Keep red mic state while we bounce the session
+      btnMic.classList.add("listening");
+      btnStop.disabled = false;
+      setStatus("Listening", "live");
+      // Fresh instance after a beat — reusing the same object dies after ~one phrase in Chrome
+      scheduleRestart(continuousEl.checked ? 120 : 250);
+    };
+
+    try {
+      rec.start();
+    } catch (e) {
+      startLock = false;
+      if (wantListen) scheduleRestart(300);
+      else {
+        setStatus("Start failed", "err");
+        hintEl.textContent = String(e && e.message ? e.message : e);
+      }
+    }
   }
 
   function startListening() {
-    try {
-      syncFinalFromEditor();
-      if (recognition) {
-        try { recognition.abort(); } catch (_) {}
-      }
-      recognition = createRecognition();
-      btnMic.dataset.want = "1";
-      recognition.start();
-    } catch (e) {
-      setStatus("Start failed", "err");
-      hintEl.textContent = String(e && e.message ? e.message : e);
-    }
+    wantListen = true;
+    setListeningUi(true);
+    beginSession();
   }
 
-  function stopListening(clearWant) {
-    if (clearWant !== false) btnMic.dataset.want = "0";
-    if (!recognition) return;
-    try { recognition.stop(); } catch (_) {
-      try { recognition.abort(); } catch (__) {}
+  function stopListening() {
+    wantListen = false;
+    clearRestart();
+    startLock = false;
+    if (recognition) {
+      try { recognition.stop(); } catch (_) {
+        try { recognition.abort(); } catch (__) {}
+      }
     }
+    setListeningUi(false);
   }
 
   btnMic.addEventListener("click", function () {
-    if (listening || btnMic.dataset.want === "1") stopListening(true);
+    if (wantListen) stopListening();
     else startListening();
   });
-  btnStop.addEventListener("click", function () { stopListening(true); });
+  btnStop.addEventListener("click", function () { stopListening(); });
 
   langEl.addEventListener("change", function () {
     localStorage.setItem("speakeasy.lang", langEl.value);
-    if (listening) {
-      restarting = true;
-      stopListening(false);
-      btnMic.dataset.want = "1";
-    }
+    if (wantListen) beginSession();
   });
   continuousEl.addEventListener("change", function () {
-    if (listening) {
-      restarting = true;
-      stopListening(false);
-      btnMic.dataset.want = "1";
-    }
+    // no hard restart required; applies on next session bounce
   });
   interimEl.addEventListener("change", function () {
-    if (listening) {
-      restarting = true;
-      stopListening(false);
-      btnMic.dataset.want = "1";
-    }
+    if (wantListen) beginSession();
   });
 
   btnCopy.addEventListener("click", async function () {
@@ -512,7 +548,7 @@ a.landing {
     try {
       await navigator.clipboard.writeText(text);
       setStatus("Copied");
-      setTimeout(function () { if (!listening) setStatus("Ready"); }, 900);
+      setTimeout(function () { if (!wantListen) setStatus("Ready"); }, 900);
     } catch (_) {
       setStatus("Copy failed", "err");
     }
@@ -523,7 +559,7 @@ a.landing {
     transcriptEl.innerHTML = "";
     wordCountEl.textContent = "0 words";
     setStatus("Cleared");
-    setTimeout(function () { if (!listening) setStatus("Ready"); }, 700);
+    setTimeout(function () { if (!wantListen) setStatus("Ready"); }, 700);
   });
 
   btnSave.addEventListener("click", function () {
@@ -540,7 +576,7 @@ a.landing {
   });
 
   transcriptEl.addEventListener("input", function () {
-    if (!listening) {
+    if (!wantListen) {
       finalText = transcriptEl.innerText;
       wordCountEl.textContent = countWords(finalText) + " words";
     }

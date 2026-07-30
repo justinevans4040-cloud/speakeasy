@@ -1,4 +1,4 @@
-const CACHE_NAME = "speakeasy-app-v1";
+const CACHE_NAME = "speakeasy-app-v2";
 
 const ASSETS = [
   "./",
