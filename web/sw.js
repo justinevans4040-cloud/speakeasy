@@ -1,8 +1,9 @@
-const CACHE_NAME = "speakeasy-shell-v2";
+const CACHE_NAME = "speakeasy-app-v1";
 
 const ASSETS = [
   "./",
   "./index.html",
+  "./landing.html",
   "./manifest.webmanifest",
   "./assets/wake-emblem-original.png",
 ];

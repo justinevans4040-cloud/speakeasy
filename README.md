@@ -1,35 +1,29 @@
 # SpeakEasy
 
-Standalone SpeakEasy — web PWA + Android Capacitor shell.
+Standalone voice → text app. No wakeforged.com / Netlify required.
 
-**Android package:** `com.wakeforged.speakeasy` (Play identity; not tied to wakeforged.com hosting)
+**Android package:** `com.wakeforged.speakeasy`
 
-## Layout
+## What opens where
 
-| Path | What |
-|------|------|
-| `web/` | Standalone PWA (source of truth) |
-| `mobile/` | Capacitor Android shell — loads **bundled** `www/` (copied from `web/`) |
-| `templates/speakeasy_landing.html` | Original template — do not edit |
-| `docs/SPEAKEASY_MOBILE_RELEASE_MANUAL.md` | Release notes |
-| `docs/INVENTORY.md` | Where copies live on disk |
+| File | What it is |
+|------|------------|
+| `web/index.html` | **The SpeakEasy app** (mic + live transcript) |
+| `web/landing.html` | Old marketing page (kept for reference) |
+| `templates/speakeasy_landing.html` | Original landing template — do not edit |
 
-## Run locally (no Netlify / no wakeforged.com)
+## Run
 
 ```bash
-# Browser
-start web/index.html
+# Browser (needs http:// — Speech API blocks file://)
+python -m http.server 8787 --directory web
+# open http://127.0.0.1:8787/
 
-# Android (bundled local web)
+# Android
 cd mobile
 npm install
 npm run sync
 npm run android
-# or: npm run build:apk
 ```
 
-Capacitor no longer points at `https://www.wakeforged.com/speakeasy/`. The app ships its own HTML.
-
-## Origin
-
-Extracted from `wakecodex` packaging. Hosting leftovers on wakeforged/Netlify are not required to run SpeakEasy.
+Engine: browser **Web Speech API** (Chrome / Edge / Android WebView). Mic permission required.
