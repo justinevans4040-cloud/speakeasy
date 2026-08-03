@@ -1,0 +1,28 @@
+{
+  "build": {
+    "win": {
+      "target": [
+        "nsis"
+      ]
+    },
+    "files": [
+      "index.js",
+      "dist/**/*"
+    ],
+    "appId": "com.wakecodex.speakeasy",
+    "productName": "speakeasy",
+    "directories": {
+      "output": "build"
+    }
+  },
+  "name": "speakeasy",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "dist": "electron-builder -w"
+  },
+  "devDependencies": {
+    "electron": "^43.2.0",
+    "electron-builder": "^26.15.3"
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "scripts": {
+    "build": "if not exist dist mkdir dist && xcopy web\\* dist\\ /s /e /y && move /y dist\\speakeasy.html dist\\index.html"
+  },
+  "dependencies": {
+    "@capacitor/android": "^8.5.0",
+    "@capacitor/cli": "^8.5.0",
+    "@capacitor/core": "^8.5.0"
+  }
+}
