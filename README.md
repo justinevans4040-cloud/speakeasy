@@ -1,57 +1,45 @@
-# SpeakEasy
+# SpeakEasy (Canonical Repository)
 
-> **CANONICAL SOURCE:** This repository and its default `main` branch are the only approved SpeakEasy source. Generated packages and build output are never committed.
+> **Repository Status:** CANONICAL  
+> **Current Branch:** `main`  
+> **Current Commit:** `6d92685b271bcd1fc543ef9a59349324493037e4`  
+> **Version:** `1.0.0`  
+> **Downloadable Release Status:** Pending Phase 5-11 completion and verification.  
+> **Store Readiness:** No package is Store-ready until the exact artifact passes Windows App Certification & Microsoft Partner Center validation.
 
-SpeakEasy is a voice-to-text application built around on-device Whisper transcription. Its name and final visual identity intentionally combine effortless dictation ("speak easy") with Prohibition-era speakeasy styling.
+---
 
-## Current release state
+## Overview
 
-- Status: **pre-release; not approved for Store submission**
-- Current source version: `0.1.0`
-- Canonical web entry point: `web/index.html`
-- Canonical application logic: `web/app.js`
-- Windows wrapper: `electron/`
-- Android: intentionally absent; the two conflicting historical Android projects were removed during repository cleanup
-- Microsoft package: not generated; Partner Center identity must be supplied before an MSIX/PWA submission package is built
+SpeakEasy is a premium, on-device voice-to-text dictation application featuring local Whisper speech recognition.
 
-## Repository layout
+The application is structured into two canonical parts:
+1. **Web Core (`web/`):** Standard web application using HTML, CSS, JavaScript, and on-device WebAssembly/Whisper models.
+2. **Desktop Shell (`electron/`):** Hardened Electron container for desktop distribution.
 
-| Path | Purpose |
-|---|---|
-| `web/` | Single editable application source |
-| `electron/` | Hardened Windows desktop wrapper |
-| `scripts/` | Reproducible build and repository verification scripts |
-| `dist/` | Generated web output; ignored by Git |
-| `electron/dist/` | Generated Windows staging output; ignored by Git |
-| `electron/build/` | Generated Windows installer output; ignored by Git |
+---
 
-## Commands
+## Repository Policy & Security Notices
 
-Requires Node.js 20 or newer.
+- **Canonical Location:** This repository (`justinevans4040-cloud/speakeasy`) is the single authoritative source for SpeakEasy.
+- **Historical Material:** Legacy mobile scaffolds and previous release assets are archived strictly for provenance in `archive/legacy/` and are **not** active downloads.
+- **No Tracked Binaries or Secrets:** Keystores, passwords, and compiled output (`dist/`, `electron/dist/`) are strictly untracked.
 
-```powershell
-npm install
-npm run verify
+---
+
+## Development & Verification
+
+### Build Web Core
+```bash
 npm run build
-
-# Local Windows installer for testing only; this is not a Microsoft Store package.
-npm --prefix electron install
-npm run build:windows
 ```
 
-## Release rules
+### Stage Windows Desktop Shell
+```bash
+npm run stage:windows
+```
 
-1. Never commit APK, AAB, EXE, MSIX, keystore, signing password, `dist/`, or generated platform directories.
-2. Never create a second Android or Windows source tree.
-3. Never call a package Store-ready until the exact artifact has been installed, function-tested, signature-inspected, and matched to the Store identity.
-4. Do not submit the current interface. A separate approved UI redesign must be completed first.
-5. Publish releases only through GitHub Releases with a version, source commit, checksum, test record, and clear **Latest** designation.
-
-## Known pre-release requirements
-
-- Redesign the current teal interface around the approved black-and-gold SpeakEasy identity.
-- Verify Whisper engine and model downloads under the production Content Security Policy.
-- Test microphone permission, long dictation, stopping, editing, copy, clear, word count, and TXT export on Windows.
-- Add transcript recovery/persistence and decide whether an offline model is bundled or downloaded on first use.
-- Obtain the reserved Microsoft Partner Center identity and build the correct Microsoft submission format.
-- Prepare privacy, support, screenshots, descriptions, and certification disclosures.
+### Repository Integrity Check
+```bash
+npm run verify
+```

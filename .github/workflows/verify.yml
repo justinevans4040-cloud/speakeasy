@@ -1,0 +1,35 @@
+name: SpeakEasy Continuous Verification
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Verify Repository Structure & Security
+        run: npm run verify
+
+      - name: Build Web Application
+        run: npm run build
+
+      - name: Stage Windows Desktop Shell
+        run: npm run stage:windows
+
+      - name: Run Dependency Audit
+        run: npm audit --audit-level=high

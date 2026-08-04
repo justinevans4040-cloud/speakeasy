@@ -1,18 +1,28 @@
 {
-  "name": "SpeakEasy",
+  "name": "SpeakEasy — On-Device Voice Dictation",
   "short_name": "SpeakEasy",
-  "start_url": "./",
-  "scope": "./",
+  "description": "Private on-device voice dictation powered by local Whisper AI",
+  "start_url": "./index.html",
   "display": "standalone",
-  "background_color": "#080a0e",
-  "theme_color": "#080a0e",
-  "description": "SpeakEasy — voice to text, instantly.",
+  "background_color": "#0a0b0d",
+  "theme_color": "#0a0b0d",
+  "orientation": "any",
   "icons": [
     {
-      "src": "./assets/wake-emblem-original.png",
+      "src": "./assets/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "./assets/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "./assets/icon-maskable.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "maskable"
     }
   ]
 }

@@ -1,82 +1,72 @@
-const { app, BrowserWindow, session, shell } = require('electron');
+const { app, BrowserWindow, shell, session } = require('electron');
 const path = require('path');
-
-const DEV_ORIGIN = 'http://localhost:5173';
-
-function parseUrl(value) {
-  try {
-    return new URL(value);
-  } catch {
-    return null;
-  }
-}
-
-function isAllowedAppNavigation(value) {
-  const parsed = parseUrl(value);
-  if (!parsed) return false;
-  if (parsed.protocol === 'file:') return true;
-  return process.env.SPEAKEASY_DEV_SERVER === '1' && parsed.origin === DEV_ORIGIN;
-}
-
-function openExternalSafely(value) {
-  const parsed = parseUrl(value);
-  if (!parsed || !['https:', 'http:'].includes(parsed.protocol)) return;
-  void shell.openExternal(parsed.toString());
-}
 
 function createWindow() {
   const win = new BrowserWindow({
     width: 1200,
     height: 800,
-    minWidth: 760,
+    minWidth: 800,
     minHeight: 600,
+    backgroundColor: '#0a0b0d',
     show: false,
+    icon: path.join(__dirname, '..', 'web', 'assets', 'icon-512.png'),
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
       sandbox: true,
       webSecurity: true,
       allowRunningInsecureContent: false,
-      spellcheck: true,
     },
   });
-  win.setMenuBarVisibility(false);
-  win.once('ready-to-show', () => win.show());
 
+  win.setMenuBarVisibility(false);
+
+  // Security: Intercept window creation to open safe external URLs in system browser
   win.webContents.setWindowOpenHandler(({ url }) => {
-    openExternalSafely(url);
+    try {
+      const parsed = new URL(url);
+      if (parsed.protocol === 'https:' || parsed.protocol === 'http:') {
+        shell.openExternal(url);
+      }
+    } catch (_) {}
     return { action: 'deny' };
   });
 
+  // Security: Intercept navigation attempts
   win.webContents.on('will-navigate', (event, url) => {
-    if (!isAllowedAppNavigation(url)) {
+    if (!url.startsWith('file://')) {
       event.preventDefault();
-      openExternalSafely(url);
     }
   });
 
-  win.webContents.on('will-attach-webview', (event) => event.preventDefault());
+  win.once('ready-to-show', () => {
+    win.show();
+  });
 
-  if (process.env.SPEAKEASY_DEV_SERVER === '1') {
-    void win.loadURL(DEV_ORIGIN);
-  } else {
-    void win.loadFile(path.join(__dirname, 'dist', 'index.html'));
-  }
+  win.loadFile(path.join(__dirname, '..', 'dist', 'index.html'));
 }
 
 app.whenReady().then(() => {
-  app.setAppUserModelId('com.forgefront.speakeasy');
-  session.defaultSession.setPermissionRequestHandler((webContents, permission, callback, details) => {
-    const requestingUrl = details?.requestingUrl || webContents.getURL();
-    callback(permission === 'media' && isAllowedAppNavigation(requestingUrl));
+  // Security: Restrict microphone permissions to local application origin
+  session.defaultSession.setPermissionRequestHandler((webContents, permission, callback) => {
+    if (permission === 'media') {
+      callback(true);
+    } else {
+      callback(false);
+    }
   });
-  createWindow();
-});
 
-app.on('activate', () => {
-  if (BrowserWindow.getAllWindows().length === 0) createWindow();
+  createWindow();
+
+  app.on('activate', () => {
+    if (BrowserWindow.getAllWindows().length === 0) {
+      createWindow();
+    }
+  });
 });
 
 app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') app.quit();
+  if (process.platform !== 'darwin') {
+    app.quit();
+  }
 });

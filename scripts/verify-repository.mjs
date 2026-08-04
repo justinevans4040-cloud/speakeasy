@@ -10,6 +10,7 @@ const required = [
   "web/app.js",
   "web/manifest.webmanifest",
   "web/sw.js",
+  "web/vendor/transformers/transformers.min.js",
   "electron/index.js",
   "electron/package.json",
 ];
@@ -43,7 +44,7 @@ for (const file of tracked.filter((name) => /\.(gradle|properties|json|js|mjs|ts
 if (existsSync(resolve(root, "web/index.html"))) {
   const html = readFileSync(resolve(root, "web/index.html"), "utf8");
   if (!html.includes("Content-Security-Policy")) failures.push("web/index.html has no Content Security Policy.");
-  if (!html.includes("https://cdn.jsdelivr.net")) failures.push("CSP does not permit the Transformers.js runtime source.");
+  if (!html.includes("huggingface.co")) failures.push("CSP does not permit HuggingFace model downloads.");
   if (html.includes("landing.html")) failures.push("web/index.html still links to the obsolete marketing page.");
 }
 

@@ -1,146 +1,208 @@
-import { pipeline, env } from "https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2";
+// SpeakEasy Application Logic — On-Device Whisper & AudioWorklet
 
-env.allowLocalModels = false;
-env.useBrowserCache = true;
+const DRAFT_KEY = "speakeasy_draft_v1";
 
-const STATUS = {
-  statusEl: document.getElementById("status"),
-  hintEl: document.getElementById("hint"),
-  engineLabel: document.getElementById("engineLabel"),
-  engineMeta: document.getElementById("engineLabelMeta"),
-  loadBar: document.getElementById("loadBar"),
-  loadWrap: document.getElementById("loadWrap"),
-};
-
+// UI Element Handles
 const ui = {
-  transcriptEl: document.getElementById("transcript"),
-  wordCountEl: document.getElementById("wordCount"),
-  langEl: document.getElementById("lang"),
+  statusBadge: document.getElementById("statusBadge"),
+  statusText: document.getElementById("statusText"),
+  progressWrap: document.getElementById("progressWrap"),
+  progressLabel: document.getElementById("progressLabel"),
+  progressPct: document.getElementById("progressPct"),
+  progressBarFill: document.getElementById("progressBarFill"),
+  restoreBanner: document.getElementById("restoreBanner"),
+  btnRestore: document.getElementById("btnRestore"),
+  btnDismissRestore: document.getElementById("btnDismissRestore"),
   btnMic: document.getElementById("btnMic"),
-  btnStop: document.getElementById("btnStop"),
+  btnMicLabel: document.getElementById("btnMicLabel"),
+  recordTimer: document.getElementById("recordTimer"),
   btnCopy: document.getElementById("btnCopy"),
-  btnClear: document.getElementById("btnClear"),
   btnSave: document.getElementById("btnSave"),
-  modeEl: document.getElementById("mode"),
+  btnClear: document.getElementById("btnClear"),
+  btnNewSession: document.getElementById("btnNewSession"),
+  btnDeleteLocalData: document.getElementById("btnDeleteLocalData"),
+  transcriptEditor: document.getElementById("transcriptEditor"),
+  wordCount: document.getElementById("wordCount"),
+  charCount: document.getElementById("charCount"),
+  confirmModal: document.getElementById("confirmModal"),
+  confirmModalText: document.getElementById("confirmModalText"),
+  btnConfirmCancel: document.getElementById("btnConfirmCancel"),
+  btnConfirmOk: document.getElementById("btnConfirmOk"),
 };
 
+// Application State
 let transcriber = null;
 let wantListen = false;
 let finalText = "";
 let mediaStream = null;
 let audioCtx = null;
-let processor = null;
+let workletNode = null;
 let sourceNode = null;
 let pcmChunks = [];
 let sampleRate = 16000;
-let transcribing = false;
 let queue = Promise.resolve();
-let speechMs = 0;
-let silenceMs = 0;
-let lastHadSpeech = false;
+let timerInterval = null;
+let recordSeconds = 0;
+let pendingConfirmAction = null;
+let isDownloading = false;
 
 const TARGET_SR = 16000;
-const CHUNK_MS = 2800;
-const SILENCE_RMS = 0.012;
-const MIN_SPEECH_MS = 450;
+const MAX_BUFFER_SECONDS = 10;
+const SILENCE_RMS = 0.01;
 
-function setStatus(text, mode) {
-  STATUS.statusEl.textContent = text;
-  STATUS.statusEl.classList.toggle("live", mode === "live");
-  STATUS.statusEl.classList.toggle("err", mode === "err");
+function setStatus(text, mode = "ready") {
+  ui.statusText.textContent = text;
+  ui.statusBadge.classList.toggle("live", mode === "live" || mode === "listening");
+  ui.statusBadge.classList.toggle("err", mode === "err");
 }
 
-function countWords(text) {
-  const t = text.trim();
-  return t ? t.split(/\s+/).length : 0;
+function updateWordAndCharCounts(text) {
+  const clean = text.trim();
+  const words = clean ? clean.split(/\s+/).length : 0;
+  const chars = clean.length;
+  ui.wordCount.textContent = `${words} word${words === 1 ? "" : "s"}`;
+  ui.charCount.textContent = `${chars} char${chars === 1 ? "" : "s"}`;
 }
 
-function escapeHtml(s) {
-  return s
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
-}
-
-function render(interim) {
-  const plain =
-    finalText +
-    (interim ? (finalText && !/\s$/.test(finalText) ? " " : "") + interim : "");
-  ui.transcriptEl.innerHTML =
-    escapeHtml(finalText) +
-    (interim
-      ? (finalText ? " " : "") +
-        '<span class="interim">' +
-        escapeHtml(interim) +
-        "</span>"
-      : "");
-  ui.wordCountEl.textContent = countWords(plain) + " words";
-  ui.transcriptEl.scrollTop = ui.transcriptEl.scrollHeight;
-}
-
-function syncFinalFromEditor() {
-  finalText = ui.transcriptEl.innerText.replace(/\u00a0/g, " ");
-}
-
-function appendFinal(chunk) {
-  const text = String(chunk || "")
-    .replace(/\[BLANK_AUDIO\]/gi, "")
-    .replace(/\s+/g, " ")
-    .trim();
-  if (!text) return;
-  if (!finalText) finalText = text;
-  else {
-    const needsSpace = !/\s$/.test(finalText) && !/^[,.;:!?]/.test(text);
-    finalText += (needsSpace ? " " : "") + text;
-  }
-  render("");
-}
-
-function setListeningUi(on) {
-  ui.btnMic.classList.toggle("listening", on);
-  ui.btnMic.setAttribute("aria-pressed", on ? "true" : "false");
-  ui.btnMic.setAttribute("aria-label", on ? "Stop listening" : "Start listening");
-  ui.btnStop.disabled = !on;
-  if (on) {
-    setStatus("Listening", "live");
-    STATUS.hintEl.textContent =
-      "Whisper is running on-device in chunks. Keep talking — tap Stop when done.";
+function saveDraft() {
+  const current = ui.transcriptEditor.innerText;
+  if (current.trim()) {
+    localStorage.setItem(DRAFT_KEY, current);
   } else {
-    setStatus("Ready");
-    STATUS.hintEl.textContent =
-      "Tap the mic to dictate. First run downloads a small on-device model (~40MB), then it stays cached.";
+    localStorage.removeItem(DRAFT_KEY);
   }
 }
 
+function checkSavedDraft() {
+  const saved = localStorage.getItem(DRAFT_KEY);
+  if (saved && saved.trim()) {
+    ui.restoreBanner.hidden = false;
+  }
+}
+
+function formatTimer(sec) {
+  const m = Math.floor(sec / 60).toString().padStart(2, "0");
+  const s = (sec % 60).toString().padStart(2, "0");
+  return `${m}:${s}`;
+}
+
+function startTimer() {
+  stopTimer();
+  recordSeconds = 0;
+  ui.recordTimer.textContent = "00:00";
+  timerInterval = setInterval(() => {
+    recordSeconds++;
+    ui.recordTimer.textContent = formatTimer(recordSeconds);
+  }, 1000);
+}
+
+function stopTimer() {
+  if (timerInterval) {
+    clearInterval(timerInterval);
+    timerInterval = null;
+  }
+}
+
+// 9 Failure Modes Error Handler
+function handleFailure(mode, details = "") {
+  let title = "Error";
+  let msg = details;
+
+  switch (mode) {
+    case "mic_denied":
+      title = "Microphone Denied";
+      msg = "Microphone access was denied. Please allow microphone permissions in your browser/OS settings.";
+      break;
+    case "no_mic":
+      title = "No Microphone Found";
+      msg = "No audio input device detected. Please connect a microphone and retry.";
+      break;
+    case "download_fail":
+      title = "Model Download Failed";
+      msg = "Could not download the Whisper AI model. Please check your internet connection and retry.";
+      break;
+    case "init_fail":
+      title = "Initialization Error";
+      msg = "Failed to initialize the local speech recognition engine.";
+      break;
+    case "unsupported_hardware":
+      title = "Hardware Unsupported";
+      msg = "Your browser does not support WebAssembly or AudioWorklet required for local AI processing.";
+      break;
+    case "insufficient_ram":
+      title = "Memory Exhausted";
+      msg = "Insufficient RAM available to process the audio chunk safely.";
+      break;
+    case "offline_first_launch":
+      title = "First Launch Offline";
+      msg = "The initial run requires internet connectivity once to download the 40MB Whisper model. Subsequent runs work 100% offline.";
+      break;
+    case "transcribe_fail":
+      title = "Transcription Error";
+      msg = "An error occurred while transcribing the audio chunk.";
+      break;
+    case "export_fail":
+      title = "Export Failed";
+      msg = "Could not generate or download the TXT file.";
+      break;
+  }
+
+  setStatus(title, "err");
+  console.error(`[SpeakEasy Error] ${mode}: ${msg}`, details);
+}
+
+// Model Loading & Caching
 async function ensureEngine() {
   if (transcriber) return transcriber;
-  STATUS.loadWrap.hidden = false;
-  STATUS.engineLabel.textContent = "Loading Whisper…";
-  setStatus("Loading engine…", "live");
 
-  transcriber = await pipeline(
-    "automatic-speech-recognition",
-    "Xenova/whisper-tiny.en",
-    {
-      progress_callback: (p) => {
-        if (!p) return;
-        if (p.status === "progress" && p.progress != null) {
-          const pct = Math.max(0, Math.min(100, Math.round(p.progress)));
-          STATUS.loadBar.style.width = pct + "%";
-          STATUS.engineLabel.textContent = "Downloading " + pct + "%";
-        } else if (p.status === "ready") {
-          STATUS.loadBar.style.width = "100%";
-        }
-      },
-    },
-  );
+  if (!navigator.onLine && !localStorage.getItem("speakeasy_model_cached")) {
+    handleFailure("offline_first_launch");
+    throw new Error("First launch requires internet connectivity.");
+  }
 
-  STATUS.loadWrap.hidden = true;
-  STATUS.engineLabel.textContent = "Whisper tiny.en (on-device)";
-  if (STATUS.engineMeta) STATUS.engineMeta.textContent = "Whisper tiny.en (on-device)";
-  setStatus("Ready");
-  return transcriber;
+  ui.progressWrap.hidden = false;
+  ui.progressLabel.textContent = "Downloading Whisper Model (~40MB)…";
+  setStatus("Downloading Model", "live");
+  isDownloading = true;
+
+  try {
+    const transformers = window.transformers;
+    if (!transformers || !transformers.pipeline) {
+      throw new Error("Transformers.js library not found locally.");
+    }
+
+    transformers.env.allowLocalModels = false;
+    transformers.env.useBrowserCache = true;
+
+    transcriber = await transformers.pipeline(
+      "automatic-speech-recognition",
+      "Xenova/whisper-tiny.en",
+      {
+        progress_callback: (p) => {
+          if (!p) return;
+          if (p.status === "progress" && p.progress != null) {
+            const pct = Math.max(0, Math.min(100, Math.round(p.progress)));
+            ui.progressBarFill.style.width = `${pct}%`;
+            ui.progressPct.textContent = `${pct}%`;
+          } else if (p.status === "ready") {
+            ui.progressBarFill.style.width = "100%";
+            ui.progressPct.textContent = "100%";
+          }
+        },
+      }
+    );
+
+    localStorage.setItem("speakeasy_model_cached", "true");
+    ui.progressWrap.hidden = true;
+    setStatus("Engine Ready");
+    isDownloading = false;
+    return transcriber;
+  } catch (err) {
+    ui.progressWrap.hidden = true;
+    isDownloading = false;
+    handleFailure("download_fail", err.message);
+    throw err;
+  }
 }
 
 function downsampleTo16k(float32, inputRate) {
@@ -160,67 +222,71 @@ function rms(buf) {
   return Math.sqrt(sum / Math.max(1, buf.length));
 }
 
-function flushPcm(force) {
+function flushPcm(force = false) {
   if (!pcmChunks.length) return;
-  const total = pcmChunks.reduce((n, c) => n + c.length, 0);
-  const merged = new Float32Array(total);
-  let off = 0;
+  const totalSamples = pcmChunks.reduce((n, c) => n + c.length, 0);
+  const merged = new Float32Array(totalSamples);
+  let offset = 0;
   for (const c of pcmChunks) {
-    merged.set(c, off);
-    off += c.length;
+    merged.set(c, offset);
+    offset += c.length;
   }
   pcmChunks = [];
-  speechMs = 0;
-  silenceMs = 0;
-  lastHadSpeech = false;
 
   const level = rms(merged);
   if (!force && level < SILENCE_RMS) return;
 
-  const audio = downsampleTo16k(merged, sampleRate);
-  enqueueTranscribe(audio);
+  const audio16k = downsampleTo16k(merged, sampleRate);
+  enqueueTranscribe(audio16k);
 }
 
 function enqueueTranscribe(audio) {
   queue = queue.then(async () => {
-    if (!audio || audio.length < TARGET_SR * 0.25) return;
-    transcribing = true;
+    if (!audio || audio.length < TARGET_SR * 0.3) return;
     try {
+      setStatus("Transcribing…", "live");
       const engine = await ensureEngine();
       const result = await engine(audio, {
         chunk_length_s: 15,
         stride_length_s: 3,
         return_timestamps: false,
       });
-      appendFinal(result && result.text ? result.text : "");
+
+      const text = (result && result.text ? result.text : "")
+        .replace(/\[BLANK_AUDIO\]/gi, "")
+        .trim();
+
+      if (text) {
+        const current = ui.transcriptEditor.innerText.trim();
+        const space = current && !/\s$/.test(current) ? " " : "";
+        ui.transcriptEditor.innerText = (current ? current + space : "") + text;
+        updateWordAndCharCounts(ui.transcriptEditor.innerText);
+        saveDraft();
+      }
     } catch (err) {
-      console.error(err);
-      setStatus("Transcribe error", "err");
-      STATUS.hintEl.textContent = String(err && err.message ? err.message : err);
+      handleFailure("transcribe_fail", err.message);
     } finally {
-      transcribing = false;
-      if (wantListen) setStatus("Listening", "live");
+      if (wantListen) {
+        setStatus("Listening", "live");
+      } else {
+        setStatus("Ready");
+      }
     }
   });
 }
 
+// AudioWorklet Dictation Logic
 async function startListening() {
-  try {
-    await ensureEngine();
-  } catch (err) {
-    setStatus("Engine failed", "err");
-    STATUS.hintEl.textContent =
-      "Could not load Whisper. Check network once for the model download, then retry.";
-    console.error(err);
+  if (!window.AudioContext && !window.webkitAudioContext) {
+    handleFailure("unsupported_hardware");
     return;
   }
 
-  wantListen = true;
-  setListeningUi(true);
-  syncFinalFromEditor();
-  pcmChunks = [];
-  speechMs = 0;
-  silenceMs = 0;
+  try {
+    await ensureEngine();
+  } catch (err) {
+    return;
+  }
 
   try {
     mediaStream = await navigator.mediaDevices.getUserMedia({
@@ -233,137 +299,226 @@ async function startListening() {
       video: false,
     });
   } catch (err) {
-    wantListen = false;
-    setListeningUi(false);
-    setStatus("Mic blocked", "err");
-    STATUS.hintEl.textContent = "Allow microphone access and try again.";
+    if (err.name === "NotAllowedError" || err.name === "PermissionDeniedError") {
+      handleFailure("mic_denied");
+    } else {
+      handleFailure("no_mic", err.message);
+    }
     return;
   }
+
+  wantListen = true;
+  ui.btnMic.classList.add("listening");
+  ui.btnMic.setAttribute("aria-pressed", "true");
+  ui.btnMicLabel.textContent = "Stop Dictating";
+  setStatus("Listening", "live");
+  startTimer();
 
   audioCtx = new (window.AudioContext || window.webkitAudioContext)();
   sampleRate = audioCtx.sampleRate;
   sourceNode = audioCtx.createMediaStreamSource(mediaStream);
-  processor = audioCtx.createScriptProcessor(4096, 1, 1);
-  const mute = audioCtx.createGain();
-  mute.gain.value = 0;
 
-  processor.onaudioprocess = (event) => {
-    if (!wantListen) return;
-    const input = event.inputBuffer.getChannelData(0);
-    const copy = new Float32Array(input.length);
-    copy.set(input);
-    pcmChunks.push(copy);
+  try {
+    await audioCtx.audioWorklet.addModule("./audio-processor.js");
+    workletNode = new AudioWorkletNode(audioCtx, "speakeasy-audio-processor");
 
-    const level = rms(copy);
-    const frameMs = (input.length / sampleRate) * 1000;
-    if (level >= SILENCE_RMS) {
-      speechMs += frameMs;
-      silenceMs = 0;
-      lastHadSpeech = true;
-    } else if (lastHadSpeech) {
-      silenceMs += frameMs;
-    }
+    workletNode.port.onmessage = (event) => {
+      if (!wantListen) return;
+      if (event.data && event.data.type === "audio_data") {
+        const chunk = event.data.buffer;
+        pcmChunks.push(chunk);
 
-    const bufferedMs =
-      (pcmChunks.reduce((n, c) => n + c.length, 0) / sampleRate) * 1000;
+        // Cap buffer memory bounds to prevent uncontrolled growth
+        const bufferedSec = (pcmChunks.reduce((n, c) => n + c.length, 0) / sampleRate);
+        if (bufferedSec >= MAX_BUFFER_SECONDS) {
+          flushPcm(true);
+        }
+      }
+    };
 
-    // Cut on pause after speech, or hard-cap chunk length for continuous talk
-    if (lastHadSpeech && silenceMs >= 420 && speechMs >= MIN_SPEECH_MS) {
-      flushPcm(true);
-    } else if (bufferedMs >= CHUNK_MS) {
-      flushPcm(true);
-    }
-  };
-
-  sourceNode.connect(processor);
-  processor.connect(mute);
-  mute.connect(audioCtx.destination);
+    sourceNode.connect(workletNode);
+    workletNode.connect(audioCtx.destination);
+  } catch (err) {
+    console.warn("AudioWorklet failed, using fallback:", err);
+    // Graceful fallback if AudioWorklet module fails
+    const processor = audioCtx.createScriptProcessor(4096, 1, 1);
+    processor.onaudioprocess = (e) => {
+      if (!wantListen) return;
+      const input = e.inputBuffer.getChannelData(0);
+      pcmChunks.push(new Float32Array(input));
+      const bufferedSec = (pcmChunks.reduce((n, c) => n + c.length, 0) / sampleRate);
+      if (bufferedSec >= 3) flushPcm(true);
+    };
+    sourceNode.connect(processor);
+    processor.connect(audioCtx.destination);
+  }
 }
 
 async function stopListening() {
   wantListen = false;
+  ui.btnMic.classList.remove("listening");
+  ui.btnMic.setAttribute("aria-pressed", "false");
+  ui.btnMicLabel.textContent = "Dictate";
+  stopTimer();
+
   flushPcm(true);
   await queue;
 
-  if (processor) {
-    try {
-      processor.disconnect();
-    } catch (_) {}
-    processor.onaudioprocess = null;
-    processor = null;
+  if (workletNode) {
+    try { workletNode.disconnect(); } catch (_) {}
+    workletNode = null;
   }
   if (sourceNode) {
-    try {
-      sourceNode.disconnect();
-    } catch (_) {}
+    try { sourceNode.disconnect(); } catch (_) {}
     sourceNode = null;
   }
   if (audioCtx) {
-    try {
-      await audioCtx.close();
-    } catch (_) {}
+    try { await audioCtx.close(); } catch (_) {}
     audioCtx = null;
   }
   if (mediaStream) {
     mediaStream.getTracks().forEach((t) => t.stop());
     mediaStream = null;
   }
-  setListeningUi(false);
+
+  setStatus("Ready");
 }
 
+// Confirmation Modal Helper
+function showConfirmation(text, onOk) {
+  ui.confirmModalText.textContent = text;
+  pendingConfirmAction = onOk;
+  ui.confirmModal.hidden = false;
+}
+
+function hideConfirmation() {
+  ui.confirmModal.hidden = true;
+  pendingConfirmAction = null;
+}
+
+// Event Listeners
 ui.btnMic.addEventListener("click", () => {
   if (wantListen) stopListening();
   else startListening();
 });
-ui.btnStop.addEventListener("click", () => stopListening());
 
 ui.btnCopy.addEventListener("click", async () => {
-  syncFinalFromEditor();
+  const text = ui.transcriptEditor.innerText.trim();
+  if (!text) return;
   try {
-    await navigator.clipboard.writeText(ui.transcriptEl.innerText.trim());
-    setStatus("Copied");
-    setTimeout(() => {
-      if (!wantListen) setStatus("Ready");
-    }, 900);
-  } catch (_) {
-    setStatus("Copy failed", "err");
+    await navigator.clipboard.writeText(text);
+    setStatus("Copied to Clipboard");
+    setTimeout(() => setStatus("Ready"), 1500);
+  } catch (err) {
+    setStatus("Copy Failed", "err");
+  }
+});
+
+ui.btnSave.addEventListener("click", () => {
+  const text = ui.transcriptEditor.innerText.trim();
+  if (!text) return;
+  try {
+    const blob = new Blob([text + "\n"], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+    a.href = url;
+    a.download = `speakeasy-transcript-${timestamp}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+    setStatus("Saved TXT");
+    setTimeout(() => setStatus("Ready"), 1500);
+  } catch (err) {
+    handleFailure("export_fail", err.message);
   }
 });
 
 ui.btnClear.addEventListener("click", () => {
-  finalText = "";
-  ui.transcriptEl.innerHTML = "";
-  ui.wordCountEl.textContent = "0 words";
-  setStatus("Cleared");
-  setTimeout(() => {
-    if (!wantListen) setStatus("Ready");
-  }, 700);
+  const current = ui.transcriptEditor.innerText.trim();
+  if (!current) return;
+  showConfirmation("Are you sure you want to clear the current transcript?", () => {
+    ui.transcriptEditor.innerText = "";
+    updateWordAndCharCounts("");
+    saveDraft();
+    setStatus("Transcript Cleared");
+    setTimeout(() => setStatus("Ready"), 1500);
+  });
 });
 
-ui.btnSave.addEventListener("click", () => {
-  syncFinalFromEditor();
-  const text = ui.transcriptEl.innerText.trim();
-  const blob = new Blob([text + "\n"], { type: "text/plain;charset=utf-8" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
-  a.href = url;
-  a.download = "speakeasy-" + stamp + ".txt";
-  a.click();
-  URL.revokeObjectURL(url);
-});
-
-ui.transcriptEl.addEventListener("input", () => {
-  if (!wantListen) {
-    finalText = ui.transcriptEl.innerText;
-    ui.wordCountEl.textContent = countWords(finalText) + " words";
+ui.btnNewSession.addEventListener("click", () => {
+  const current = ui.transcriptEditor.innerText.trim();
+  if (current) {
+    showConfirmation("Start a new session? Unsaved text will be cleared.", () => {
+      if (wantListen) stopListening();
+      ui.transcriptEditor.innerText = "";
+      updateWordAndCharCounts("");
+      saveDraft();
+      setStatus("New Session Started");
+      setTimeout(() => setStatus("Ready"), 1500);
+    });
+  } else {
+    ui.transcriptEditor.innerText = "";
+    updateWordAndCharCounts("");
+    setStatus("New Session Started");
+    setTimeout(() => setStatus("Ready"), 1500);
   }
 });
 
-// Warm the engine in background after first paint
-ensureEngine().catch(() => {
-  STATUS.engineLabel.textContent = "Engine idle — will load on first mic tap";
+ui.btnRestore.addEventListener("click", () => {
+  const saved = localStorage.getItem(DRAFT_KEY);
+  if (saved) {
+    ui.transcriptEditor.innerText = saved;
+    updateWordAndCharCounts(saved);
+    ui.restoreBanner.hidden = true;
+    setStatus("Draft Restored");
+    setTimeout(() => setStatus("Ready"), 1500);
+  }
 });
+
+ui.btnDismissRestore.addEventListener("click", () => {
+  ui.restoreBanner.hidden = true;
+});
+
+ui.btnDeleteLocalData.addEventListener("click", () => {
+  showConfirmation("Delete all locally stored drafts and model cache keys?", () => {
+    localStorage.removeItem(DRAFT_KEY);
+    localStorage.removeItem("speakeasy_model_cached");
+    ui.transcriptEditor.innerText = "";
+    updateWordAndCharCounts("");
+    setStatus("Local Data Deleted");
+    setTimeout(() => setStatus("Ready"), 1500);
+  });
+});
+
+ui.btnConfirmCancel.addEventListener("click", hideConfirmation);
+ui.btnConfirmOk.addEventListener("click", () => {
+  if (pendingConfirmAction) pendingConfirmAction();
+  hideConfirmation();
+});
+
+ui.transcriptEditor.addEventListener("input", () => {
+  updateWordAndCharCounts(ui.transcriptEditor.innerText);
+  saveDraft();
+});
+
+// Keyboard Shortcuts
+window.addEventListener("keydown", (e) => {
+  if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+    e.preventDefault();
+    ui.btnMic.click();
+  }
+});
+
+// Clean up audio tracks on window unload
+window.addEventListener("beforeunload", () => {
+  if (mediaStream) {
+    mediaStream.getTracks().forEach((t) => t.stop());
+  }
+});
+
+// Initial Setup
+checkSavedDraft();
+updateWordAndCharCounts(ui.transcriptEditor.innerText);
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
