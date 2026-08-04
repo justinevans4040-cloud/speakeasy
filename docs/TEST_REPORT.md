@@ -1,4 +1,4 @@
-# SpeakEasy 1.1.0 Verification Report
+# SpeakEasy 1.2.0 Verification Report
 
 This report distinguishes checks completed against the current source from Windows and hardware checks that still require the package candidate.
 
@@ -14,12 +14,14 @@ This report distinguishes checks completed against the current source from Windo
 | Electron staging | PASS | `npm run stage:windows` |
 | Incorrect WAKE emblem absent from active UI | PASS | repository verification rule and source inspection |
 | Inline presentation code removed from active HTML | PASS | repository verification rule |
+| Demo gate protects dictation, editing, copying, saving, exporting, microphone testing, and saved settings | PASS | source gate assertions and DOM reference check |
+| Approved prices and Partner Center offer tokens are present | PASS | repository verification rule for `$3.99`, `$14.99`, `speakeasy_monthly`, and `speakeasy_lifetime` |
 
 ## Windows package checks
 
 | ID | Test | Status |
 |---|---|---:|
-| WIN-01 | Build exactly one SpeakEasy 1.1.0 AppX on `windows-latest` | PENDING CI |
+| WIN-01 | Build exactly one SpeakEasy 1.2.0 AppX on `windows-latest` | PENDING CI |
 | WIN-02 | Extract AppxManifest.xml and verify Name, Publisher, and PublisherDisplayName | PENDING CI |
 | WIN-03 | Generate and retain AppX SHA-256 checksum | PENDING CI |
 | WIN-04 | Confirm Electron fuse readback during packaging | PENDING CI |
@@ -49,6 +51,11 @@ This report distinguishes checks completed against the current source from Windo
 | HD-17 | Delete local draft and cached-model marker | NOT TESTED |
 | HD-18 | Check layout at 100%, 125%, 150%, and 200% scaling | NOT TESTED |
 | HD-19 | Close application and confirm audio/process cleanup | NOT TESTED |
+| MS-01 | Confirm no-purchase Microsoft account receives demonstration access | NOT TESTED |
+| MS-02 | Purchase `$3.99/month` add-on and confirm full access while active | NOT TESTED |
+| MS-03 | Purchase `$14.99` lifetime add-on and confirm permanent full access | NOT TESTED |
+| MS-04 | Restore monthly and lifetime purchases after reinstall | NOT TESTED |
+| MS-05 | Cancel/expire monthly subscription and confirm return to demo | NOT TESTED |
 
 ## Release decision
 

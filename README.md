@@ -6,9 +6,11 @@ SpeakEasy by ForgeFront Systems is a private, on-device voice-to-text desktop ap
 
 - Repository: `justinevans4040-cloud/speakeasy`
 - Canonical branch: `main`
-- Current application line: `1.1.x`
+- Current application line: `1.2.x`
 - Microsoft Store product ID: `9NN1J22323MG`
 - Microsoft Store listing: https://apps.microsoft.com/detail/9NN1J22323MG
+- Microsoft Store monthly add-on product ID: `speakeasy_monthly` (`$3.99/month`)
+- Microsoft Store lifetime add-on product ID: `speakeasy_lifetime` (`$14.99 one time`, future updates included)
 
 The repository is the authoritative source. Compiled packages are valid only when produced from the latest passing `main` workflow. Historical material remains under `archive/legacy/` for provenance and is not part of the active application or build.
 
@@ -42,3 +44,9 @@ npm run build:windows
 ```
 
 `npm run build:windows` requires Windows. GitHub Actions produces a `SpeakEasy-Microsoft-Store-Candidate` artifact containing the AppX and its SHA-256 checksum. That artifact is a submission candidate, not proof of Microsoft certification. WACK and Partner Center submission remain release gates.
+
+## Microsoft Store licensing
+
+Version 1.2.0 launches in demonstration mode until Microsoft Store reports an active `speakeasy_monthly` subscription or an owned `speakeasy_lifetime` durable add-on. Demonstration mode leaves the interface and settings pages available to explore while blocking dictation, transcript editing, copying, saving, exporting, microphone testing, and saved-setting changes.
+
+The Electron main process runs the bundled `store-license.ps1` bridge inside the packaged Windows app. The bridge uses `Windows.Services.Store.StoreContext` to discover the two associated add-ons by their Partner Center in-app offer tokens and verifies ownership against Microsoft Store. No payment information or SpeakEasy account is created or stored. Purchase buttons open the matching Microsoft Store add-on listing; **Restore purchase** rechecks the current Microsoft account.

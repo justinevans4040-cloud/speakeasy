@@ -51,6 +51,18 @@ const ui = {
   micMeterFill: document.getElementById("micMeterFill"),
   micTestStatus: document.getElementById("micTestStatus"),
   settingMicrophone: document.getElementById("settingMicrophone"),
+  licenseBanner: document.getElementById("licenseBanner"),
+  licenseKicker: document.getElementById("licenseKicker"),
+  licenseTitle: document.getElementById("licenseTitle"),
+  licenseDetail: document.getElementById("licenseDetail"),
+  btnOpenUpgrade: document.getElementById("btnOpenUpgrade"),
+  upgradeModal: document.getElementById("upgradeModal"),
+  btnCloseUpgrade: document.getElementById("btnCloseUpgrade"),
+  btnContinueDemo: document.getElementById("btnContinueDemo"),
+  btnBuyMonthly: document.getElementById("btnBuyMonthly"),
+  btnBuyLifetime: document.getElementById("btnBuyLifetime"),
+  btnRestorePurchase: document.getElementById("btnRestorePurchase"),
+  purchaseMessage: document.getElementById("purchaseMessage"),
 };
 
 // Application State
@@ -69,6 +81,8 @@ let pendingConfirmAction = null;
 let previouslyFocusedElement = null;
 let settings = loadSettings();
 let micTestStream = null;
+let licenseState = { access: "checking", entitlement: null, products: {} };
+let upgradePreviouslyFocused = null;
 
 const TARGET_SR = 16000;
 const MAX_BUFFER_SECONDS = 4;
@@ -77,6 +91,95 @@ const SILENCE_RMS = 0.01;
 function setStatus(text, mode = "ready") {
   ui.statusText.textContent = text;
   ui.statusBadge.dataset.mode = mode;
+}
+
+function hasFullAccess() {
+  return licenseState.access === "full";
+}
+
+function openUpgrade() {
+  upgradePreviouslyFocused = document.activeElement;
+  ui.upgradeModal.hidden = false;
+  ui.btnBuyLifetime.focus();
+}
+
+function closeUpgrade() {
+  ui.upgradeModal.hidden = true;
+  if (upgradePreviouslyFocused instanceof HTMLElement) upgradePreviouslyFocused.focus();
+  upgradePreviouslyFocused = null;
+}
+
+function requireFullAccess() {
+  if (hasFullAccess()) return true;
+  openUpgrade();
+  return false;
+}
+
+function applyLicenseState(state) {
+  licenseState = state && typeof state === "object" ? state : { access: "demo", products: {} };
+  const unlocked = hasFullAccess();
+  ui.licenseBanner.dataset.access = unlocked ? "full" : "demo";
+  ui.btnOpenUpgrade.hidden = unlocked;
+  ui.transcriptEditor.contentEditable = String(unlocked);
+  ui.transcriptEditor.classList.toggle("demo-locked", !unlocked);
+  ui.transcriptEditor.dataset.placeholder = unlocked
+    ? "Your transcript will appear here. You can also type or edit at any time."
+    : "Demo mode — unlock SpeakEasy to dictate, type, edit, copy, save, and export.";
+
+  if (unlocked) {
+    const accessName = licenseState.entitlement === "lifetime" ? "Lifetime access" : "Monthly access";
+    ui.licenseKicker.textContent = "Microsoft Store license verified";
+    ui.licenseTitle.textContent = `${accessName} active`;
+    ui.licenseDetail.textContent = "Dictation, editing, saving, copying, exporting, and saved settings are unlocked.";
+    checkSavedDraft();
+  } else {
+    ui.licenseKicker.textContent = "Free demonstration";
+    ui.licenseTitle.textContent = "Explore the room. Unlock when you’re ready.";
+    ui.licenseDetail.textContent = "$3.99 monthly or $14.99 lifetime with all future updates.";
+  }
+}
+
+async function refreshLicense({ announce = false } = {}) {
+  if (!window.speakeasyStore?.getStatus) {
+    applyLicenseState({ access: "demo", entitlement: null, products: {}, reason: "Store licensing requires the Windows app." });
+    return;
+  }
+  if (announce) ui.purchaseMessage.textContent = "Checking your Microsoft Store purchases…";
+  try {
+    const state = await window.speakeasyStore.getStatus();
+    applyLicenseState(state);
+    if (announce) {
+      ui.purchaseMessage.textContent = hasFullAccess()
+        ? "Purchase restored. SpeakEasy is fully unlocked."
+        : "No active monthly or lifetime purchase was found for this Microsoft account.";
+    }
+    if (hasFullAccess()) setTimeout(closeUpgrade, 900);
+  } catch {
+    applyLicenseState({ access: "demo", entitlement: null, products: {} });
+    if (announce) ui.purchaseMessage.textContent = "Microsoft Store could not verify a purchase. Please try again.";
+  }
+}
+
+async function openPurchase(productName) {
+  if (!window.speakeasyStore?.openPurchase) {
+    ui.purchaseMessage.textContent = "Purchases are available from the packaged Microsoft Store version of SpeakEasy.";
+    return;
+  }
+  const button = productName === "monthly" ? ui.btnBuyMonthly : ui.btnBuyLifetime;
+  const original = button.textContent;
+  button.disabled = true;
+  button.textContent = "Opening Microsoft Store…";
+  try {
+    const result = await window.speakeasyStore.openPurchase(productName);
+    ui.purchaseMessage.textContent = result?.ok
+      ? "Complete the purchase in Microsoft Store, return here, then select Restore purchase."
+      : (result?.message || "Microsoft Store could not open this purchase.");
+  } catch {
+    ui.purchaseMessage.textContent = "Microsoft Store could not open this purchase.";
+  } finally {
+    button.disabled = false;
+    button.textContent = original;
+  }
 }
 
 function loadSettings() {
@@ -366,6 +469,7 @@ function enqueueTranscribe(audio) {
 
 // AudioWorklet Dictation Logic
 async function startListening() {
+  if (!requireFullAccess()) return;
   if (!window.AudioContext && !window.webkitAudioContext) {
     handleFailure("unsupported_hardware");
     return;
@@ -511,6 +615,7 @@ async function enumerateMicrophones() {
 }
 
 async function testMicrophone() {
+  if (!requireFullAccess()) return;
   if (micTestStream) {
     micTestStream.getTracks().forEach((track) => track.stop());
     micTestStream = null;
@@ -556,6 +661,7 @@ document.querySelectorAll("[data-settings-tab]").forEach((tab) => {
 
 ui.settingsForm.addEventListener("submit", (event) => {
   event.preventDefault();
+  if (!requireFullAccess()) return;
   const previousQuality = settings.quality;
   settings = readSettingsForm();
   localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
@@ -567,6 +673,7 @@ ui.settingsForm.addEventListener("submit", (event) => {
 });
 
 ui.btnRestoreDefaults.addEventListener("click", () => {
+  if (!requireFullAccess()) return;
   settings = { ...DEFAULT_SETTINGS };
   populateSettingsForm();
   applySettings();
@@ -592,6 +699,7 @@ ui.btnMic.addEventListener("click", () => {
 });
 
 ui.btnCopy.addEventListener("click", async () => {
+  if (!requireFullAccess()) return;
   const text = ui.transcriptEditor.innerText.trim();
   if (!text) return;
   try {
@@ -604,6 +712,7 @@ ui.btnCopy.addEventListener("click", async () => {
 });
 
 ui.btnSave.addEventListener("click", () => {
+  if (!requireFullAccess()) return;
   const text = ui.transcriptEditor.innerText.trim();
   if (!text) return;
   try {
@@ -631,6 +740,7 @@ ui.btnSave.addEventListener("click", () => {
 });
 
 ui.btnClear.addEventListener("click", () => {
+  if (!requireFullAccess()) return;
   const current = ui.transcriptEditor.innerText.trim();
   if (!current) return;
   showConfirmation("Are you sure you want to clear the current transcript?", () => {
@@ -643,6 +753,7 @@ ui.btnClear.addEventListener("click", () => {
 });
 
 ui.btnNewSession.addEventListener("click", () => {
+  if (!requireFullAccess()) return;
   const current = ui.transcriptEditor.innerText.trim();
   if (current) {
     showConfirmation("Start a new session? Unsaved text will be cleared.", () => {
@@ -662,6 +773,7 @@ ui.btnNewSession.addEventListener("click", () => {
 });
 
 ui.btnRestore.addEventListener("click", () => {
+  if (!requireFullAccess()) return;
   const saved = localStorage.getItem(DRAFT_KEY);
   if (saved) {
     ui.transcriptEditor.innerText = saved;
@@ -698,11 +810,23 @@ ui.transcriptEditor.addEventListener("input", () => {
   saveDraft();
 });
 
+ui.btnOpenUpgrade.addEventListener("click", openUpgrade);
+ui.btnCloseUpgrade.addEventListener("click", closeUpgrade);
+ui.btnContinueDemo.addEventListener("click", closeUpgrade);
+ui.btnBuyMonthly.addEventListener("click", () => openPurchase("monthly"));
+ui.btnBuyLifetime.addEventListener("click", () => openPurchase("lifetime"));
+ui.btnRestorePurchase.addEventListener("click", () => refreshLicense({ announce: true }));
+
 // Keyboard Shortcuts
 window.addEventListener("keydown", (e) => {
   if (e.key === "Escape" && !ui.confirmModal.hidden) {
     e.preventDefault();
     hideConfirmation();
+    return;
+  }
+  if (e.key === "Escape" && !ui.upgradeModal.hidden) {
+    e.preventDefault();
+    closeUpgrade();
     return;
   }
   if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
@@ -721,8 +845,12 @@ window.addEventListener("beforeunload", () => {
 // Initial Setup
 applySettings();
 populateSettingsForm();
-checkSavedDraft();
 updateWordAndCharCounts(ui.transcriptEditor.innerText);
+refreshLicense();
+
+window.addEventListener("focus", () => {
+  if (!hasFullAccess()) refreshLicense();
+});
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {

@@ -13,6 +13,8 @@ const required = [
   "web/sw.js",
   "web/vendor/transformers/transformers.min.js",
   "electron/index.js",
+  "electron/preload.js",
+  "electron/store-license.ps1",
   "electron/package.json",
   "web/assets/speakeasy-emblem.png",
   "web/assets/icon-192.png",
@@ -72,6 +74,18 @@ if (existsSync(resolve(root, "electron/package.json"))) {
   for (const [key, value] of Object.entries(expected)) {
     if (appx[key] !== value) failures.push(`Microsoft package identity mismatch for appx.${key}.`);
   }
+}
+
+if (existsSync(resolve(root, "electron/index.js")) && existsSync(resolve(root, "web/app.js")) && existsSync(resolve(root, "web/index.html"))) {
+  const main = readFileSync(resolve(root, "electron/index.js"), "utf8");
+  const app = readFileSync(resolve(root, "web/app.js"), "utf8");
+  const html = readFileSync(resolve(root, "web/index.html"), "utf8");
+  for (const productId of ["speakeasy_monthly", "speakeasy_lifetime"]) {
+    if (!main.includes(productId)) failures.push(`Microsoft Store product ID missing from Electron bridge: ${productId}.`);
+  }
+  if (!main.includes("ms-windows-store://pdp/")) failures.push("Microsoft Store purchase URI is missing.");
+  if (!app.includes("requireFullAccess")) failures.push("Demo feature gate is missing.");
+  if (!html.includes("$3.99") || !html.includes("$14.99")) failures.push("Approved monthly or lifetime price is missing from the purchase screen.");
 }
 
 if (failures.length) {

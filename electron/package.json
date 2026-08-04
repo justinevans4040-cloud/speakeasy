@@ -1,6 +1,6 @@
 {
   "name": "speakeasy",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "author": "ForgeFront Systems",
   "description": "SpeakEasy by ForgeFront voice-to-text desktop application",
   "main": "index.js",
@@ -16,6 +16,8 @@
     },
     "files": [
       "index.js",
+      "preload.js",
+      "store-license.ps1",
       "dist/**/*"
     ],
     "afterPack": "./scripts/apply-fuses.js",
