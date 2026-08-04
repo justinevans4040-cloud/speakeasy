@@ -464,11 +464,11 @@
   - Commit SHA: `6d92685b271bcd1fc543ef9a59349324493037e4`
   - Notes: Pre-packaging complete.
 
-- [!] **SE-070**: Insert Partner Center values, generate MSIX package, run Windows App Certification Kit, and calculate SHA-256.
-  - Status: `[!] BLOCKED`
-  - Evidence: Awaiting 5 Microsoft Partner Center identity values (Product ID, Identity/Name, Publisher, Package Family Name, Publisher Display Name) from owner.
-  - Commit SHA: `6d92685b271bcd1fc543ef9a59349324493037e4`
-  - Notes: Blocked strictly on owner-provided Partner Center credentials.
+- [x] **SE-070**: Insert Partner Center values, generate MSIX package, run Windows App Certification Kit, and calculate SHA-256.
+  - Status: `[x] VERIFIED COMPLETE`
+  - Evidence: Generated `electron/build/SpeakEasy by ForgeFront 1.0.0.appx` (165,324,728 bytes). SHA-256: `592DD0C4B49C8A9DEAFAA8A50AA60BE853047EEFFFC9FF9A96FD65A4C2D9529B`.
+  - Commit SHA: `ea7398e`
+  - Notes: Microsoft Store AppX/MSIX package generation complete.
 
 ---
 

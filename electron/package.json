@@ -1,29 +1,40 @@
 {
+  "name": "speakeasy",
+  "version": "1.0.0",
+  "author": "ForgeFront Systems",
+  "description": "SpeakEasy by ForgeFront voice-to-text desktop application",
+  "main": "index.js",
+  "scripts": {
+    "dist": "electron-builder --win appx"
+  },
   "build": {
-    "win": {
-      "target": [
-        "nsis"
-      ]
+    "appId": "ForgeFrontSystems.SpeakEasybyForgeFront",
+    "productName": "SpeakEasy by ForgeFront",
+    "directories": {
+      "output": "build"
     },
     "files": [
       "index.js",
       "dist/**/*"
     ],
-    "appId": "com.forgefront.speakeasy",
-    "productName": "SpeakEasy",
-    "directories": {
-      "output": "build"
+    "win": {
+      "target": [
+        "appx"
+      ],
+      "icon": "../web/assets/icon-512.png"
+    },
+    "appx": {
+      "identityName": "ForgeFrontSystems.SpeakEasybyForgeFront",
+      "publisher": "CN=8E906094-1F36-496B-A889-858E25A1FCB3",
+      "publisherDisplayName": "ForgeFront Systems",
+      "applicationId": "SpeakEasy",
+      "languages": [
+        "en-US"
+      ]
     }
   },
-  "name": "speakeasy",
-  "version": "0.1.0",
-  "description": "SpeakEasy voice-to-text desktop application",
-  "main": "index.js",
-  "scripts": {
-    "dist": "electron-builder --win nsis"
-  },
   "devDependencies": {
-    "electron": "^43.2.0",
+    "electron": "^34.0.0",
     "electron-builder": "^26.15.3"
   }
 }
