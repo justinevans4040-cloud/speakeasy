@@ -1,11 +1,11 @@
 {
-  "name": "SpeakEasy — On-Device Voice Dictation",
+  "name": "SpeakEasy by ForgeFront Systems",
   "short_name": "SpeakEasy",
-  "description": "Private on-device voice dictation powered by local Whisper AI",
+  "description": "Private on-device voice dictation from ForgeFront Systems",
   "start_url": "./index.html",
   "display": "standalone",
-  "background_color": "#0a0b0d",
-  "theme_color": "#0a0b0d",
+  "background_color": "#080806",
+  "theme_color": "#080806",
   "orientation": "any",
   "icons": [
     {
@@ -23,6 +23,12 @@
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"
+    },
+    {
+      "src": "./assets/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
     }
   ]
 }

@@ -3,458 +3,151 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https://huggingface.co https://cdn-lfs.huggingface.co https://*.huggingface.co; font-src 'self' data:;" />
-  <meta name="theme-color" content="#0a0b0d" />
-  <title>SpeakEasy — On-Device Voice Dictation</title>
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-eval'; style-src 'self'; img-src 'self' data:; connect-src 'self' https://huggingface.co https://cdn-lfs.huggingface.co https://*.huggingface.co; font-src 'self' data:; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'none'; frame-ancestors 'none';" />
+  <meta name="theme-color" content="#080806" />
+  <title>SpeakEasy — Private On-Device Dictation</title>
   <link rel="manifest" href="./manifest.webmanifest" />
-  <link rel="icon" href="./assets/wake-emblem-original.png" type="image/png" />
-
-  <style>
-    :root {
-      --bg-dark: #0a0b0d;
-      --bg-card: #121418;
-      --bg-input: #1a1d24;
-      --border-gold: rgba(212, 175, 55, 0.35);
-      --gold-primary: #d4af37;
-      --gold-hover: #f3e5ab;
-      --gold-active: #aa8c2c;
-      --text-main: #f5f0eb;
-      --text-muted: #a09a90;
-      --accent-red: #c0392b;
-      --accent-green: #27ae60;
-      --font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    }
-
-    @media (prefers-reduced-motion: reduce) {
-      * { animation: none !important; transition: none !important; }
-    }
-
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-
-    body {
-      background-color: var(--bg-dark);
-      color: var(--text-main);
-      font-family: var(--font-family);
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      padding: 1.5rem 1rem;
-      line-height: 1.5;
-    }
-
-    .app-container {
-      width: 100%;
-      max-width: 900px;
-      display: flex;
-      flex-direction: column;
-      gap: 1.25rem;
-    }
-
-    /* Art Deco Header */
-    header {
-      background: var(--bg-card);
-      border: 1px solid var(--border-gold);
-      border-radius: 8px;
-      padding: 1.25rem;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
-      position: relative;
-    }
-
-    header::after {
-      content: '';
-      position: absolute;
-      bottom: -1px;
-      left: 10%;
-      right: 10%;
-      height: 1px;
-      background: linear-gradient(90deg, transparent, var(--gold-primary), transparent);
-    }
-
-    .brand-group {
-      display: flex;
-      align-items: center;
-      gap: 1rem;
-    }
-
-    .brand-badge {
-      width: 48px;
-      height: 48px;
-      border-radius: 50%;
-      border: 2px solid var(--gold-primary);
-      padding: 3px;
-      background: #000;
-    }
-
-    .brand-badge img {
-      width: 100%;
-      height: 100%;
-      object-fit: contain;
-      border-radius: 50%;
-    }
-
-    .brand-title {
-      font-size: 1.5rem;
-      font-weight: 700;
-      color: var(--gold-primary);
-      letter-spacing: 1px;
-      text-transform: uppercase;
-    }
-
-    .brand-subtitle {
-      font-size: 0.8rem;
-      color: var(--text-muted);
-      letter-spacing: 0.5px;
-    }
-
-    .status-badge {
-      background: rgba(212, 175, 55, 0.1);
-      border: 1px solid var(--border-gold);
-      padding: 0.4rem 0.8rem;
-      border-radius: 20px;
-      font-size: 0.85rem;
-      color: var(--gold-primary);
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-    }
-
-    .status-dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      background: var(--gold-primary);
-    }
-
-    .status-badge.live .status-dot {
-      background: var(--accent-red);
-      box-shadow: 0 0 8px var(--accent-red);
-      animation: pulse 1.5s infinite;
-    }
-
-    @keyframes pulse {
-      0% { opacity: 1; }
-      50% { opacity: 0.4; }
-      100% { opacity: 1; }
-    }
-
-    /* Restore Banner */
-    .restore-banner {
-      background: rgba(212, 175, 55, 0.15);
-      border: 1px solid var(--gold-primary);
-      padding: 0.75rem 1rem;
-      border-radius: 6px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 1rem;
-      font-size: 0.9rem;
-    }
-
-    .restore-banner button {
-      background: var(--gold-primary);
-      color: #000;
-      border: none;
-      padding: 0.3rem 0.8rem;
-      border-radius: 4px;
-      font-weight: 600;
-      cursor: pointer;
-    }
-
-    /* Download Progress Bar */
-    .progress-wrap {
-      background: var(--bg-card);
-      border: 1px solid var(--border-gold);
-      border-radius: 6px;
-      padding: 0.75rem 1rem;
-      display: flex;
-      flex-direction: column;
-      gap: 0.5rem;
-    }
-
-    .progress-bar-bg {
-      background: var(--bg-input);
-      height: 8px;
-      border-radius: 4px;
-      overflow: hidden;
-    }
-
-    .progress-bar-fill {
-      background: var(--gold-primary);
-      height: 100%;
-      width: 0%;
-      transition: width 0.3s ease;
-    }
-
-    /* Main Workspace Card */
-    .workspace-card {
-      background: var(--bg-card);
-      border: 1px solid var(--border-gold);
-      border-radius: 8px;
-      padding: 1.5rem;
-      display: flex;
-      flex-direction: column;
-      gap: 1.25rem;
-      box-shadow: 0 6px 30px rgba(0, 0, 0, 0.6);
-    }
-
-    /* Control Bar */
-    .control-bar {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      flex-wrap: wrap;
-      gap: 1rem;
-    }
-
-    .btn-record-main {
-      background: linear-gradient(135deg, var(--gold-primary), var(--gold-active));
-      color: #000;
-      border: 2px solid var(--gold-hover);
-      padding: 0.8rem 1.75rem;
-      border-radius: 30px;
-      font-size: 1.1rem;
-      font-weight: 700;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      gap: 0.6rem;
-      box-shadow: 0 4px 15px rgba(212, 175, 55, 0.3);
-      transition: all 0.2s ease;
-    }
-
-    .btn-record-main:hover {
-      background: var(--gold-hover);
-      transform: translateY(-1px);
-    }
-
-    .btn-record-main:focus-visible {
-      outline: 3px solid var(--gold-hover);
-      outline-offset: 2px;
-    }
-
-    .btn-record-main.listening {
-      background: linear-gradient(135deg, #e74c3c, #c0392b);
-      color: #fff;
-      border-color: #ff7979;
-      box-shadow: 0 4px 15px rgba(231, 76, 60, 0.4);
-    }
-
-    .record-timer {
-      font-family: monospace;
-      font-size: 1.2rem;
-      color: var(--gold-primary);
-      background: var(--bg-input);
-      padding: 0.4rem 0.8rem;
-      border-radius: 4px;
-      border: 1px solid var(--border-gold);
-    }
-
-    .action-group {
-      display: flex;
-      gap: 0.5rem;
-      flex-wrap: wrap;
-    }
-
-    .btn-action {
-      background: var(--bg-input);
-      color: var(--text-main);
-      border: 1px solid var(--border-gold);
-      padding: 0.5rem 0.9rem;
-      border-radius: 6px;
-      font-size: 0.85rem;
-      font-weight: 600;
-      cursor: pointer;
-      transition: background 0.2s ease;
-    }
-
-    .btn-action:hover {
-      background: rgba(212, 175, 55, 0.2);
-      color: var(--gold-hover);
-    }
-
-    .btn-action:focus-visible {
-      outline: 2px solid var(--gold-primary);
-    }
-
-    /* Editor Box */
-    .editor-container {
-      position: relative;
-    }
-
-    .transcript-editor {
-      width: 100%;
-      min-height: 280px;
-      max-height: 500px;
-      overflow-y: auto;
-      background: var(--bg-input);
-      border: 1px solid var(--border-gold);
-      border-radius: 6px;
-      padding: 1.25rem;
-      font-size: 1.05rem;
-      color: var(--text-main);
-      outline: none;
-      white-space: pre-wrap;
-      word-break: break-word;
-    }
-
-    .transcript-editor:focus-visible {
-      border-color: var(--gold-primary);
-      box-shadow: 0 0 8px rgba(212, 175, 55, 0.4);
-    }
-
-    .transcript-editor .interim {
-      color: var(--gold-primary);
-      font-style: italic;
-      border-bottom: 1px dashed var(--gold-primary);
-    }
-
-    /* Footer Metadata & Controls */
-    .meta-bar {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      color: var(--text-muted);
-      font-size: 0.85rem;
-      padding-top: 0.5rem;
-      border-top: 1px solid rgba(212, 175, 55, 0.15);
-    }
-
-    .btn-text-danger {
-      background: none;
-      border: none;
-      color: var(--accent-red);
-      font-size: 0.8rem;
-      cursor: pointer;
-      text-decoration: underline;
-    }
-
-    /* Confirmation Modal */
-    .modal-overlay {
-      position: fixed;
-      inset: 0;
-      background: rgba(0, 0, 0, 0.75);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      z-index: 1000;
-      padding: 1rem;
-    }
-
-    .modal-card {
-      background: var(--bg-card);
-      border: 2px solid var(--gold-primary);
-      border-radius: 8px;
-      padding: 1.5rem;
-      max-width: 400px;
-      width: 100%;
-      display: flex;
-      flex-direction: column;
-      gap: 1rem;
-      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.8);
-    }
-
-    .modal-actions {
-      display: flex;
-      justify-content: flex-end;
-      gap: 0.75rem;
-    }
-  </style>
-
-  <!-- Locally Bundled Transformers.js -->
-  <script src="./vendor/transformers/transformers.min.js"></script>
+  <link rel="icon" href="./assets/icon-192.png" type="image/png" />
+  <link rel="stylesheet" href="./styles.css" />
 </head>
 <body>
-  <div class="app-container">
-    
-    <!-- Art Deco Header -->
-    <header>
-      <div class="brand-group">
-        <div class="brand-badge">
-          <img src="./assets/wake-emblem-original.png" alt="SpeakEasy Emblem" />
+  <div class="app-shell">
+    <aside class="brand-rail" aria-label="SpeakEasy">
+      <img class="brand-emblem" src="./assets/speakeasy-emblem.png" alt="SpeakEasy by ForgeFront Systems" />
+      <div class="brand-copy">
+        <p class="eyebrow">Private dictation room</p>
+        <h1>Your words stay<br />behind closed doors.</h1>
+        <p>Speech is transcribed on this device. No account, no cloud transcript, no audience.</p>
+      </div>
+      <dl class="privacy-ledger">
+        <div><dt>Transcription</dt><dd>On device</dd></div>
+        <div><dt>Draft storage</dt><dd>Local only</dd></div>
+      </dl>
+    </aside>
+
+    <main class="workspace">
+      <section class="app-view" id="dictationView">
+        <header class="workspace-header">
+          <div>
+            <p class="eyebrow">ForgeFront Systems presents</p>
+            <h2>The Dictation Room</h2>
+            <p class="workspace-intro">Speak naturally. Edit freely. Take the transcript wherever it needs to go.</p>
+          </div>
+          <div class="session-state">
+            <button class="button button-quiet settings-link" id="btnOpenSettings" type="button">Settings</button>
+            <div class="status-badge" id="statusBadge" role="status" aria-live="polite" data-mode="ready"><span class="status-indicator" aria-hidden="true"></span><span id="statusText">Ready</span></div>
+            <time class="record-timer" id="recordTimer" aria-label="Recording duration">00:00</time>
+          </div>
+        </header>
+
+        <section class="notice restore-banner" id="restoreBanner" aria-label="Recovered draft" hidden>
+          <div><strong>There’s a draft waiting.</strong><span>Restore the words saved on this device or dismiss them.</span></div>
+          <div class="notice-actions"><button class="button button-small button-primary" id="btnRestore" type="button">Restore draft</button><button class="button button-small button-quiet" id="btnDismissRestore" type="button">Dismiss</button></div>
+        </section>
+
+        <section class="notice progress-wrap" id="progressWrap" aria-label="Speech engine setup" hidden>
+          <div class="progress-copy"><span id="progressLabel">Preparing the private speech engine…</span><span id="progressPct">0%</span></div>
+          <div class="progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-labelledby="progressLabel"><div class="progress-fill" id="progressBarFill"></div></div>
+          <p>The first setup downloads the speech model. After that, dictation can run offline.</p>
+        </section>
+
+        <section class="transcript-card" aria-labelledby="transcriptTitle">
+          <div class="transcript-heading">
+            <div><p class="section-kicker">Session transcript</p><h3 id="transcriptTitle">What would you like to say?</h3></div>
+            <div class="document-actions" aria-label="Transcript actions"><button class="button button-quiet" id="btnCopy" type="button">Copy</button><button class="button button-quiet" id="btnSave" type="button">Save TXT</button><button class="button button-quiet" id="btnClear" type="button">Clear</button></div>
+          </div>
+          <div class="transcript-editor" id="transcriptEditor" contenteditable="true" role="textbox" aria-multiline="true" aria-label="Editable transcript" data-placeholder="Your transcript will appear here. You can also type or edit at any time."></div>
+          <div class="transcript-footer"><div class="document-counts" aria-live="polite"><span id="wordCount">0 words</span><span id="charCount">0 chars</span></div><p>Saved automatically on this device.</p></div>
+        </section>
+
+        <section class="control-deck" aria-label="Dictation controls">
+          <div class="control-copy"><p class="section-kicker">Microphone</p><strong>Press once to begin. Press again when you’re finished.</strong><span>Keyboard shortcut: Ctrl or Command + Enter</span></div>
+          <div class="microphone-medallion" aria-hidden="true"><img src="./assets/speakeasy-emblem.png" alt="" /></div>
+          <button class="button button-record" id="btnMic" type="button" aria-label="Start dictating" aria-pressed="false"><span class="record-mark" aria-hidden="true"></span><span id="btnMicLabel">Start dictating</span></button>
+        </section>
+
+        <footer class="workspace-footer"><button class="button button-quiet" id="btnNewSession" type="button">New session</button><button class="button button-danger" id="btnDeleteLocalData" type="button">Delete local data</button></footer>
+      </section>
+
+      <section class="app-view settings-view" id="settingsView" hidden>
+        <header class="workspace-header settings-header">
+          <div><h2>Settings</h2><p class="workspace-intro">Tune the room to your voice.</p></div>
+          <div class="session-state"><button class="button button-quiet" id="btnBackToDictation" type="button">← Back to Dictation Room</button><div class="status-badge"><span class="status-indicator" aria-hidden="true"></span><span>Ready</span></div></div>
+        </header>
+
+        <div class="settings-layout">
+          <nav class="settings-nav" aria-label="Settings categories">
+            <button class="settings-tab active" data-settings-tab="dictation" type="button">Dictation</button>
+            <button class="settings-tab" data-settings-tab="vocabulary" type="button">Vocabulary &amp; Commands</button>
+            <button class="settings-tab" data-settings-tab="audio" type="button">Audio</button>
+            <button class="settings-tab" data-settings-tab="privacy" type="button">Privacy &amp; Storage</button>
+            <button class="settings-tab" data-settings-tab="export" type="button">Export</button>
+            <button class="settings-tab" data-settings-tab="accessibility" type="button">Accessibility</button>
+            <button class="settings-tab" data-settings-tab="about" type="button">About</button>
+          </nav>
+
+          <form class="settings-panel" id="settingsForm">
+            <section class="settings-section active" data-settings-panel="dictation">
+              <div class="setting-row"><label for="settingLanguage">Language</label><select id="settingLanguage" name="language"><option value="en-US">English (United States)</option></select></div>
+              <fieldset class="setting-row setting-options"><legend>Recognition quality</legend><label><input type="radio" name="quality" value="fast" /> Fast</label><label><input type="radio" name="quality" value="balanced" /> Balanced</label><label><input type="radio" name="quality" value="best" /> Best Accuracy</label></fieldset>
+              <label class="setting-row switch-row"><span>Live transcript preview<small>Transcribe in shorter rolling segments.</small></span><input type="checkbox" name="livePreview" role="switch" /></label>
+              <label class="setting-row switch-row"><span>Automatic punctuation</span><input type="checkbox" name="autoPunctuation" role="switch" /></label>
+              <label class="setting-row switch-row"><span>Smart capitalization</span><input type="checkbox" name="smartCapitalization" role="switch" /></label>
+              <label class="setting-row switch-row"><span>Remove filler words</span><input type="checkbox" name="removeFillers" role="switch" /></label>
+              <label class="setting-row switch-row"><span>Profanity filter</span><input type="checkbox" name="profanityFilter" role="switch" /></label>
+              <fieldset class="setting-row setting-options"><legend>Default mode</legend><label><input type="radio" name="defaultMode" value="raw" /> Raw Dictation</label><label><input type="radio" name="defaultMode" value="polished" /> Polished</label></fieldset>
+            </section>
+
+            <section class="settings-section" data-settings-panel="vocabulary">
+              <div class="section-heading"><div><h3>Vocabulary &amp; Commands</h3><p>Teach SpeakEasy names, specialist terms, and reusable phrases.</p></div></div>
+              <label class="field-stack">Custom vocabulary<textarea name="customVocabulary" rows="5" placeholder="One word or phrase per line"></textarea></label>
+              <label class="field-stack">Text replacements<textarea name="replacements" rows="5" placeholder="spoken phrase = replacement text"></textarea></label>
+              <label class="setting-row switch-row"><span>Apply replacements after transcription</span><input type="checkbox" name="applyReplacements" role="switch" /></label>
+            </section>
+
+            <section class="settings-section" data-settings-panel="audio">
+              <div class="section-heading"><div><h3>Audio</h3><p>Choose and test the microphone used for dictation.</p></div></div>
+              <div class="setting-row"><label for="settingMicrophone">Microphone</label><select id="settingMicrophone" name="microphone"><option value="default">System default</option></select></div>
+              <label class="setting-row switch-row"><span>Noise suppression</span><input type="checkbox" name="noiseSuppression" role="switch" /></label>
+              <label class="setting-row switch-row"><span>Echo cancellation</span><input type="checkbox" name="echoCancellation" role="switch" /></label>
+              <label class="field-stack">Silence sensitivity<input type="range" name="silenceSensitivity" min="1" max="10" step="1" /></label>
+              <div class="mic-test"><button class="button button-quiet" id="btnTestMicrophone" type="button">Test microphone</button><div class="meter" aria-label="Microphone input level"><span id="micMeterFill"></span></div><span id="micTestStatus">Not tested</span></div>
+            </section>
+
+            <section class="settings-section" data-settings-panel="privacy">
+              <div class="section-heading"><div><h3>Privacy &amp; Storage</h3><p>Dictation and drafts stay on this device.</p></div><span class="local-badge">Local only</span></div>
+              <label class="setting-row switch-row"><span>Save draft automatically</span><input type="checkbox" name="autoSave" role="switch" /></label>
+              <label class="setting-row switch-row"><span>Retain microphone audio<small>Off by default. SpeakEasy does not need to keep recordings.</small></span><input type="checkbox" name="retainAudio" role="switch" /></label>
+              <button class="button button-danger" id="btnClearPrivacyData" type="button">Delete local transcript and settings</button>
+            </section>
+
+            <section class="settings-section" data-settings-panel="export">
+              <div class="section-heading"><div><h3>Export</h3><p>Choose the default file created by Save.</p></div></div>
+              <fieldset class="setting-row setting-options"><legend>Default format</legend><label><input type="radio" name="exportFormat" value="txt" /> Plain text (.txt)</label><label><input type="radio" name="exportFormat" value="md" /> Markdown (.md)</label><label><input type="radio" name="exportFormat" value="json" /> JSON (.json)</label></fieldset>
+              <label class="setting-row switch-row"><span>Include session date in file</span><input type="checkbox" name="includeDate" role="switch" /></label>
+            </section>
+
+            <section class="settings-section" data-settings-panel="accessibility">
+              <div class="section-heading"><div><h3>Accessibility</h3><p>Adjust the room without compromising its character.</p></div></div>
+              <div class="setting-row"><label for="settingTextSize">Transcript text size</label><select id="settingTextSize" name="textSize"><option value="standard">Standard</option><option value="large">Large</option><option value="xlarge">Extra large</option></select></div>
+              <label class="setting-row switch-row"><span>High contrast</span><input type="checkbox" name="highContrast" role="switch" /></label>
+              <label class="setting-row switch-row"><span>Reduce motion</span><input type="checkbox" name="reducedMotion" role="switch" /></label>
+              <label class="setting-row switch-row"><span>Audio confirmation cues</span><input type="checkbox" name="audioCues" role="switch" /></label>
+            </section>
+
+            <section class="settings-section" data-settings-panel="about">
+              <div class="section-heading"><div><h3>About SpeakEasy</h3><p>Private voice-to-text by ForgeFront Systems.</p></div></div>
+              <dl class="about-list"><div><dt>Version</dt><dd>1.1.0</dd></div><div><dt>Speech engine</dt><dd>Whisper, on device</dd></div><div><dt>Cloud transcript</dt><dd>Never</dd></div><div><dt>Microsoft Store ID</dt><dd>9NN1J22323MG</dd></div></dl>
+            </section>
+
+            <div class="settings-actions"><button class="button button-quiet" id="btnRestoreDefaults" type="button">Restore defaults</button><button class="button button-primary" type="submit">Save settings</button></div>
+          </form>
         </div>
-        <div>
-          <h1 class="brand-title">SpeakEasy</h1>
-          <div class="brand-subtitle">Private On-Device Dictation</div>
-        </div>
-      </div>
-      <div class="status-badge" id="statusBadge" role="status" aria-live="polite">
-        <span class="status-dot"></span>
-        <span id="statusText">Ready</span>
-      </div>
-    </header>
-
-    <!-- Restore Unsaved Draft Banner -->
-    <div class="restore-banner" id="restoreBanner" hidden>
-      <span>An unsaved draft from a previous session was recovered.</span>
-      <div>
-        <button id="btnRestore">Restore Draft</button>
-        <button id="btnDismissRestore" style="background:none; color:var(--text-muted); border:1px solid var(--border-gold);">Dismiss</button>
-      </div>
-    </div>
-
-    <!-- Download / Engine Load Progress -->
-    <div class="progress-wrap" id="progressWrap" hidden>
-      <div style="display:flex; justify-content:space-between; font-size:0.85rem;">
-        <span id="progressLabel">Downloading Whisper Model…</span>
-        <span id="progressPct">0%</span>
-      </div>
-      <div class="progress-bar-bg">
-        <div class="progress-bar-fill" id="progressBarFill"></div>
-      </div>
-    </div>
-
-    <!-- Main Dictation Workspace -->
-    <main class="workspace-card">
-      <div class="control-bar">
-        <button class="btn-record-main" id="btnMic" aria-label="Start listening" aria-pressed="false">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/>
-            <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
-          </svg>
-          <span id="btnMicLabel">Dictate</span>
-        </button>
-
-        <div class="record-timer" id="recordTimer">00:00</div>
-
-        <div class="action-group">
-          <button class="btn-action" id="btnCopy">Copy</button>
-          <button class="btn-action" id="btnSave">Save TXT</button>
-          <button class="btn-action" id="btnClear">Clear</button>
-          <button class="btn-action" id="btnNewSession">New Session</button>
-        </div>
-      </div>
-
-      <!-- Editable Transcript Box -->
-      <div class="editor-container">
-        <div class="transcript-editor" id="transcriptEditor" contenteditable="true" role="textbox" aria-multiline="true" aria-label="Transcript workspace" data-placeholder="Tap Dictate or start typing your transcript here…"></div>
-      </div>
-
-      <!-- Footer Info -->
-      <div class="meta-bar">
-        <div>
-          <span id="wordCount">0 words</span> | <span id="charCount">0 chars</span>
-        </div>
-        <button class="btn-text-danger" id="btnDeleteLocalData">Delete Local Cache</button>
-      </div>
+      </section>
     </main>
   </div>
 
-  <!-- Clear / New Session Confirmation Modal -->
-  <div class="modal-overlay" id="confirmModal" hidden>
-    <div class="modal-card">
-      <h3 style="color:var(--gold-primary);">Clear Unsaved Transcript?</h3>
-      <p id="confirmModalText">You have unsaved text in your transcript. Are you sure you want to clear it?</p>
-      <div class="modal-actions">
-        <button class="btn-action" id="btnConfirmCancel">Cancel</button>
-        <button class="btn-action" id="btnConfirmOk" style="background:var(--accent-red); color:#fff; border:none;">Clear Transcript</button>
-      </div>
-    </div>
-  </div>
-
+  <div class="modal-overlay" id="confirmModal" hidden><section class="modal-card" role="dialog" aria-modal="true" aria-labelledby="confirmModalTitle" aria-describedby="confirmModalText"><p class="section-kicker">Please confirm</p><h3 id="confirmModalTitle">Clear unsaved transcript?</h3><p id="confirmModalText">Are you sure?</p><div class="modal-actions"><button class="button button-quiet" id="btnConfirmCancel" type="button">Cancel</button><button class="button button-danger-solid" id="btnConfirmOk" type="button">Confirm</button></div></section></div>
   <script src="./app.js" type="module"></script>
 </body>
 </html>

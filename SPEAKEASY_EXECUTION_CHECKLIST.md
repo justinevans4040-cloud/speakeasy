@@ -1,5 +1,63 @@
 # SpeakEasy Execution Checklist
 
+## Phase 14 — SpeakEasy 1.1.0 Redesign and Microsoft Packaging
+
+- [x] **SE-078**: Replace active WAKE artwork with the approved SpeakEasy microphone-and-fedora emblem.
+  - Status: `[x] VERIFIED COMPLETE`
+  - Evidence: `web/assets/speakeasy-emblem.png`; active HTML contains no WAKE asset reference.
+  - Notes: Original WAKE artwork was preserved under `archive/legacy/assets/`, not discarded.
+
+- [x] **SE-079**: Add the exact maker line `by ForgeFront Systems` as subordinate emblem text.
+  - Status: `[x] VERIFIED COMPLETE`
+  - Evidence: Approved final emblem in `web/assets/speakeasy-emblem.png`.
+
+- [x] **SE-080**: Rebuild the active interface around the approved Prohibition-era visual direction while preserving dictation behavior.
+  - Status: `[x] VERIFIED COMPLETE`
+  - Evidence: `web/index.html`, `web/styles.css`, and unchanged application control IDs verified against `web/app.js`.
+
+- [x] **SE-081**: Generate exact-size Microsoft and PWA icon assets from the approved emblem.
+  - Status: `[x] VERIFIED COMPLETE`
+  - Evidence: `icon-192.png` 192×192; `store-icon-300.png` 300×300; `icon-512.png`, `square-logo.png`, and `icon-maskable.png` 512×512.
+
+- [x] **SE-082**: Remove invalid active package artwork without deleting its historical record.
+  - Status: `[x] VERIFIED COMPLETE`
+  - Evidence: Invalid PNG-disguised-as-ICO moved to `archive/legacy/assets/app-icon-invalid-png-as-ico`.
+
+- [x] **SE-083**: Advance the source and Electron package version to 1.1.0.
+  - Status: `[x] VERIFIED COMPLETE`
+  - Evidence: Root and Electron package manifests and lockfiles agree on `1.1.0`.
+
+- [x] **SE-084**: Enforce exact Microsoft Partner Center identity values in repository verification.
+  - Status: `[x] VERIFIED COMPLETE`
+  - Evidence: `scripts/verify-repository.mjs` fails on any Name, Publisher, PublisherDisplayName, or ApplicationId mismatch.
+
+- [x] **SE-085**: Build a Windows CI path that creates one AppX, verifies its extracted manifest, writes SHA-256, and uploads one named artifact.
+  - Status: `[x] VERIFIED COMPLETE`
+  - Evidence: `.github/workflows/verify.yml` and `scripts/verify-appx.ps1`.
+
+- [x] **SE-086**: Remove stale current-download claims and isolate the old 1.0.0 checksum as legacy evidence.
+  - Status: `[x] VERIFIED COMPLETE`
+  - Evidence: `README.md`; `archive/legacy/package-checksums-v1.0.0.sha256`.
+
+- [x] **SE-087**: Pass current source verification, web build, Windows staging, JavaScript checks, and high-threshold dependency audits.
+  - Status: `[x] VERIFIED COMPLETE`
+  - Evidence: Both dependency trees report zero vulnerabilities; `npm run verify`, `npm run build`, and `npm run stage:windows` pass.
+
+- [ ] **SE-088**: Complete same-viewport rendered comparison of the rebuilt UI against the approved visual reference.
+  - Status: `[ ] BLOCKED IN CURRENT ENVIRONMENT`
+  - Evidence: `design-qa.md`.
+  - Notes: The cloud browser security policy rejected the local preview address and local-only preview document. This is not marked passed without a rendered comparison.
+
+- [ ] **SE-089**: Run the Windows workflow and verify the generated SpeakEasy 1.1.0 AppX artifact.
+  - Status: `[ ] PENDING GITHUB ACTIONS`
+  - Evidence required: passing workflow, uploaded AppX, generated `.sha256`, and successful manifest inspection output.
+
+- [ ] **SE-090**: Complete Windows installation, microphone/offline/manual matrix, and WACK certification.
+  - Status: `[ ] NOT TESTED`
+  - Evidence required: completed `docs/TEST_REPORT.md` and retained WACK report.
+
+---
+
 ## Phase 1 — Read-Only Verification
 
 - [x] **SE-001**: Create `SPEAKEASY_EXECUTION_CHECKLIST.md` in root of standalone SpeakEasy repository.

@@ -1,6 +1,7 @@
 name: SpeakEasy Continuous Verification & Build
 
 on:
+  workflow_dispatch:
   push:
     branches: [ main ]
   pull_request:
@@ -32,7 +33,7 @@ jobs:
         run: npm --prefix electron audit --audit-level=high
 
       - name: Audit Root Dependencies
-        run: npm audit --audit-level=high || true
+        run: npm audit --audit-level=high
 
       - name: Build Web Application
         run: npm run build
@@ -44,5 +45,15 @@ jobs:
         run: npm run build:windows
 
       - name: Generate Package Checksum
-        run: |
-          Get-FileHash -Algorithm SHA256 (Get-ChildItem -Path electron/build/*.appx) | Format-List
+        shell: pwsh
+        run: ./scripts/verify-appx.ps1 -BuildDirectory ./electron/build
+
+      - name: Upload Microsoft Store Package Candidate
+        uses: actions/upload-artifact@v4
+        with:
+          name: SpeakEasy-Microsoft-Store-Candidate
+          path: |
+            electron/build/*.appx
+            electron/build/*.sha256
+          if-no-files-found: error
+          retention-days: 30

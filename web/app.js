@@ -1,6 +1,19 @@
 // SpeakEasy Application Logic — On-Device Whisper & AudioWorklet
 
+import { env as transformersEnv, pipeline } from "./vendor/transformers/transformers.min.js";
+
 const DRAFT_KEY = "speakeasy_draft_v1";
+const SETTINGS_KEY = "speakeasy_settings_v1";
+
+const DEFAULT_SETTINGS = {
+  language: "en-US", quality: "balanced", livePreview: true,
+  autoPunctuation: true, smartCapitalization: true, removeFillers: false,
+  profanityFilter: false, defaultMode: "raw", customVocabulary: "",
+  replacements: "", applyReplacements: true, microphone: "default",
+  noiseSuppression: true, echoCancellation: true, silenceSensitivity: "4",
+  autoSave: true, retainAudio: false, exportFormat: "txt", includeDate: true,
+  textSize: "standard", highContrast: false, reducedMotion: false, audioCues: false,
+};
 
 // UI Element Handles
 const ui = {
@@ -28,12 +41,21 @@ const ui = {
   confirmModalText: document.getElementById("confirmModalText"),
   btnConfirmCancel: document.getElementById("btnConfirmCancel"),
   btnConfirmOk: document.getElementById("btnConfirmOk"),
+  dictationView: document.getElementById("dictationView"),
+  settingsView: document.getElementById("settingsView"),
+  btnOpenSettings: document.getElementById("btnOpenSettings"),
+  btnBackToDictation: document.getElementById("btnBackToDictation"),
+  settingsForm: document.getElementById("settingsForm"),
+  btnRestoreDefaults: document.getElementById("btnRestoreDefaults"),
+  btnTestMicrophone: document.getElementById("btnTestMicrophone"),
+  micMeterFill: document.getElementById("micMeterFill"),
+  micTestStatus: document.getElementById("micTestStatus"),
+  settingMicrophone: document.getElementById("settingMicrophone"),
 };
 
 // Application State
 let transcriber = null;
 let wantListen = false;
-let finalText = "";
 let mediaStream = null;
 let audioCtx = null;
 let workletNode = null;
@@ -44,16 +66,83 @@ let queue = Promise.resolve();
 let timerInterval = null;
 let recordSeconds = 0;
 let pendingConfirmAction = null;
-let isDownloading = false;
+let previouslyFocusedElement = null;
+let settings = loadSettings();
+let micTestStream = null;
 
 const TARGET_SR = 16000;
-const MAX_BUFFER_SECONDS = 10;
+const MAX_BUFFER_SECONDS = 4;
 const SILENCE_RMS = 0.01;
 
 function setStatus(text, mode = "ready") {
   ui.statusText.textContent = text;
-  ui.statusBadge.classList.toggle("live", mode === "live" || mode === "listening");
-  ui.statusBadge.classList.toggle("err", mode === "err");
+  ui.statusBadge.dataset.mode = mode;
+}
+
+function loadSettings() {
+  try {
+    return { ...DEFAULT_SETTINGS, ...JSON.parse(localStorage.getItem(SETTINGS_KEY) || "{}") };
+  } catch {
+    return { ...DEFAULT_SETTINGS };
+  }
+}
+
+function applySettings() {
+  document.body.dataset.textSize = settings.textSize;
+  document.body.dataset.highContrast = String(Boolean(settings.highContrast));
+  document.body.dataset.reducedMotion = String(Boolean(settings.reducedMotion));
+  ui.btnSave.textContent = `Save ${settings.exportFormat.toUpperCase()}`;
+}
+
+function populateSettingsForm() {
+  for (const [key, value] of Object.entries(settings)) {
+    const fields = ui.settingsForm.elements.namedItem(key);
+    if (!fields) continue;
+    if (typeof value === "boolean") fields.checked = value;
+    else if (fields instanceof RadioNodeList) fields.value = value;
+    else fields.value = value;
+  }
+}
+
+function readSettingsForm() {
+  const form = new FormData(ui.settingsForm);
+  const next = { ...settings };
+  for (const key of Object.keys(DEFAULT_SETTINGS)) {
+    if (typeof DEFAULT_SETTINGS[key] === "boolean") {
+      next[key] = Boolean(ui.settingsForm.elements.namedItem(key)?.checked);
+    } else {
+      next[key] = String(form.get(key) ?? DEFAULT_SETTINGS[key]);
+    }
+  }
+  return next;
+}
+
+function showView(name) {
+  const inSettings = name === "settings";
+  ui.dictationView.hidden = inSettings;
+  ui.settingsView.hidden = !inSettings;
+  if (inSettings) {
+    populateSettingsForm();
+    enumerateMicrophones();
+  }
+  window.scrollTo({ top: 0, behavior: settings.reducedMotion ? "auto" : "smooth" });
+}
+
+function postProcessTranscript(input) {
+  let text = input.trim();
+  if (settings.removeFillers || settings.defaultMode === "polished") {
+    text = text.replace(/\b(?:um+|uh+|erm|like,?|you know)\b[ ,]*/gi, "").replace(/\s{2,}/g, " ");
+  }
+  if (settings.applyReplacements && settings.replacements.trim()) {
+    for (const line of settings.replacements.split("\n")) {
+      const [spoken, ...replacement] = line.split("=");
+      if (!spoken?.trim() || !replacement.length) continue;
+      text = text.replace(new RegExp(spoken.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi"), replacement.join("=").trim());
+    }
+  }
+  if (settings.smartCapitalization && text) text = text[0].toUpperCase() + text.slice(1);
+  if (settings.profanityFilter) text = text.replace(/\b(fuck(?:ing|ed|er|s)?|shit(?:ty)?|damn)\b/gi, (word) => "•".repeat(word.length));
+  return text;
 }
 
 function updateWordAndCharCounts(text) {
@@ -65,6 +154,7 @@ function updateWordAndCharCounts(text) {
 }
 
 function saveDraft() {
+  if (!settings.autoSave) return;
   const current = ui.transcriptEditor.innerText;
   if (current.trim()) {
     localStorage.setItem(DRAFT_KEY, current);
@@ -161,22 +251,21 @@ async function ensureEngine() {
   }
 
   ui.progressWrap.hidden = false;
-  ui.progressLabel.textContent = "Downloading Whisper Model (~40MB)…";
+  ui.progressLabel.textContent = "Downloading the private speech model (~40MB)…";
   setStatus("Downloading Model", "live");
-  isDownloading = true;
 
   try {
-    const transformers = window.transformers;
-    if (!transformers || !transformers.pipeline) {
-      throw new Error("Transformers.js library not found locally.");
-    }
+    transformersEnv.allowLocalModels = false;
+    transformersEnv.useBrowserCache = true;
 
-    transformers.env.allowLocalModels = false;
-    transformers.env.useBrowserCache = true;
-
-    transcriber = await transformers.pipeline(
+    const modelByQuality = {
+      fast: "Xenova/whisper-tiny.en",
+      balanced: "Xenova/whisper-base.en",
+      best: "Xenova/whisper-small.en",
+    };
+    transcriber = await pipeline(
       "automatic-speech-recognition",
-      "Xenova/whisper-tiny.en",
+      modelByQuality[settings.quality] || modelByQuality.balanced,
       {
         progress_callback: (p) => {
           if (!p) return;
@@ -184,9 +273,11 @@ async function ensureEngine() {
             const pct = Math.max(0, Math.min(100, Math.round(p.progress)));
             ui.progressBarFill.style.width = `${pct}%`;
             ui.progressPct.textContent = `${pct}%`;
+            ui.progressBarFill.parentElement.setAttribute("aria-valuenow", String(pct));
           } else if (p.status === "ready") {
             ui.progressBarFill.style.width = "100%";
             ui.progressPct.textContent = "100%";
+            ui.progressBarFill.parentElement.setAttribute("aria-valuenow", "100");
           }
         },
       }
@@ -195,11 +286,9 @@ async function ensureEngine() {
     localStorage.setItem("speakeasy_model_cached", "true");
     ui.progressWrap.hidden = true;
     setStatus("Engine Ready");
-    isDownloading = false;
     return transcriber;
   } catch (err) {
     ui.progressWrap.hidden = true;
-    isDownloading = false;
     handleFailure("download_fail", err.message);
     throw err;
   }
@@ -252,9 +341,9 @@ function enqueueTranscribe(audio) {
         return_timestamps: false,
       });
 
-      const text = (result && result.text ? result.text : "")
+      const text = postProcessTranscript((result && result.text ? result.text : "")
         .replace(/\[BLANK_AUDIO\]/gi, "")
-        .trim();
+        .trim());
 
       if (text) {
         const current = ui.transcriptEditor.innerText.trim();
@@ -291,9 +380,10 @@ async function startListening() {
   try {
     mediaStream = await navigator.mediaDevices.getUserMedia({
       audio: {
+        deviceId: settings.microphone !== "default" ? { exact: settings.microphone } : undefined,
         channelCount: 1,
-        echoCancellation: true,
-        noiseSuppression: true,
+        echoCancellation: settings.echoCancellation,
+        noiseSuppression: settings.noiseSuppression,
         autoGainControl: true,
       },
       video: false,
@@ -310,7 +400,8 @@ async function startListening() {
   wantListen = true;
   ui.btnMic.classList.add("listening");
   ui.btnMic.setAttribute("aria-pressed", "true");
-  ui.btnMicLabel.textContent = "Stop Dictating";
+  ui.btnMicLabel.textContent = "Stop dictating";
+  ui.btnMic.setAttribute("aria-label", "Stop dictating");
   setStatus("Listening", "live");
   startTimer();
 
@@ -358,7 +449,8 @@ async function stopListening() {
   wantListen = false;
   ui.btnMic.classList.remove("listening");
   ui.btnMic.setAttribute("aria-pressed", "false");
-  ui.btnMicLabel.textContent = "Dictate";
+  ui.btnMicLabel.textContent = "Start dictating";
+  ui.btnMic.setAttribute("aria-label", "Start dictating");
   stopTimer();
 
   flushPcm(true);
@@ -388,15 +480,112 @@ async function stopListening() {
 function showConfirmation(text, onOk) {
   ui.confirmModalText.textContent = text;
   pendingConfirmAction = onOk;
+  previouslyFocusedElement = document.activeElement;
   ui.confirmModal.hidden = false;
+  ui.btnConfirmCancel.focus();
 }
 
 function hideConfirmation() {
   ui.confirmModal.hidden = true;
   pendingConfirmAction = null;
+  if (previouslyFocusedElement instanceof HTMLElement) previouslyFocusedElement.focus();
+  previouslyFocusedElement = null;
+}
+
+async function enumerateMicrophones() {
+  if (!navigator.mediaDevices?.enumerateDevices) return;
+  try {
+    const devices = (await navigator.mediaDevices.enumerateDevices()).filter((device) => device.kind === "audioinput");
+    const current = settings.microphone;
+    ui.settingMicrophone.innerHTML = '<option value="default">System default</option>';
+    devices.forEach((device, index) => {
+      const option = document.createElement("option");
+      option.value = device.deviceId;
+      option.textContent = device.label || `Microphone ${index + 1}`;
+      ui.settingMicrophone.append(option);
+    });
+    ui.settingMicrophone.value = [...ui.settingMicrophone.options].some((option) => option.value === current) ? current : "default";
+  } catch {
+    ui.micTestStatus.textContent = "Device list unavailable";
+  }
+}
+
+async function testMicrophone() {
+  if (micTestStream) {
+    micTestStream.getTracks().forEach((track) => track.stop());
+    micTestStream = null;
+  }
+  ui.micTestStatus.textContent = "Listening…";
+  try {
+    micTestStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+    await enumerateMicrophones();
+    const context = new AudioContext();
+    const analyser = context.createAnalyser();
+    analyser.fftSize = 256;
+    context.createMediaStreamSource(micTestStream).connect(analyser);
+    const levels = new Uint8Array(analyser.frequencyBinCount);
+    const started = performance.now();
+    const draw = () => {
+      analyser.getByteFrequencyData(levels);
+      const average = levels.reduce((sum, value) => sum + value, 0) / levels.length;
+      ui.micMeterFill.style.width = `${Math.min(100, average * 1.7)}%`;
+      if (performance.now() - started < 5000) requestAnimationFrame(draw);
+      else {
+        micTestStream?.getTracks().forEach((track) => track.stop());
+        micTestStream = null;
+        context.close();
+        ui.micTestStatus.textContent = average > 2 ? "Microphone working" : "No input detected";
+      }
+    };
+    draw();
+  } catch (error) {
+    ui.micTestStatus.textContent = "Microphone permission required";
+  }
 }
 
 // Event Listeners
+ui.btnOpenSettings.addEventListener("click", () => showView("settings"));
+ui.btnBackToDictation.addEventListener("click", () => showView("dictation"));
+
+document.querySelectorAll("[data-settings-tab]").forEach((tab) => {
+  tab.addEventListener("click", () => {
+    document.querySelectorAll("[data-settings-tab]").forEach((item) => item.classList.toggle("active", item === tab));
+    document.querySelectorAll("[data-settings-panel]").forEach((panel) => panel.classList.toggle("active", panel.dataset.settingsPanel === tab.dataset.settingsTab));
+  });
+});
+
+ui.settingsForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+  const previousQuality = settings.quality;
+  settings = readSettingsForm();
+  localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+  if (previousQuality !== settings.quality) transcriber = null;
+  applySettings();
+  showView("dictation");
+  setStatus("Settings Saved");
+  setTimeout(() => setStatus("Ready"), 1500);
+});
+
+ui.btnRestoreDefaults.addEventListener("click", () => {
+  settings = { ...DEFAULT_SETTINGS };
+  populateSettingsForm();
+  applySettings();
+});
+
+ui.btnTestMicrophone.addEventListener("click", testMicrophone);
+
+document.getElementById("btnClearPrivacyData").addEventListener("click", () => {
+  showConfirmation("Delete the local transcript and all saved SpeakEasy settings from this device?", () => {
+    localStorage.removeItem(DRAFT_KEY);
+    localStorage.removeItem(SETTINGS_KEY);
+    settings = { ...DEFAULT_SETTINGS };
+    ui.transcriptEditor.innerText = "";
+    updateWordAndCharCounts("");
+    populateSettingsForm();
+    applySettings();
+  });
+});
+
 ui.btnMic.addEventListener("click", () => {
   if (wantListen) stopListening();
   else startListening();
@@ -418,15 +607,23 @@ ui.btnSave.addEventListener("click", () => {
   const text = ui.transcriptEditor.innerText.trim();
   if (!text) return;
   try {
-    const blob = new Blob([text + "\n"], { type: "text/plain;charset=utf-8" });
+    const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+    const format = settings.exportFormat;
+    const payload = format === "json"
+      ? JSON.stringify({ transcript: text, createdAt: new Date().toISOString() }, null, 2)
+      : format === "md"
+        ? `# SpeakEasy transcript\n\n${text}\n`
+        : text + "\n";
+    const mime = format === "json" ? "application/json" : "text/plain;charset=utf-8";
+    const blob = new Blob([payload], { type: mime });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
-    const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
     a.href = url;
-    a.download = `speakeasy-transcript-${timestamp}.txt`;
+    const datePart = settings.includeDate ? `-${timestamp}` : "";
+    a.download = `speakeasy-transcript${datePart}.${format}`;
     a.click();
     URL.revokeObjectURL(url);
-    setStatus("Saved TXT");
+    setStatus(`Saved ${format.toUpperCase()}`);
     setTimeout(() => setStatus("Ready"), 1500);
   } catch (err) {
     handleFailure("export_fail", err.message);
@@ -503,6 +700,11 @@ ui.transcriptEditor.addEventListener("input", () => {
 
 // Keyboard Shortcuts
 window.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && !ui.confirmModal.hidden) {
+    e.preventDefault();
+    hideConfirmation();
+    return;
+  }
   if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
     e.preventDefault();
     ui.btnMic.click();
@@ -517,6 +719,8 @@ window.addEventListener("beforeunload", () => {
 });
 
 // Initial Setup
+applySettings();
+populateSettingsForm();
 checkSavedDraft();
 updateWordAndCharCounts(ui.transcriptEditor.innerText);
 

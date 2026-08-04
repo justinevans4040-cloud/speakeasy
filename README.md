@@ -1,53 +1,44 @@
-# SpeakEasy (Canonical Repository)
+# SpeakEasy
 
-> **Repository Status:** CANONICAL  
-> **Current Branch:** `main`  
-> **Target Commit:** `27e30c8`  
-> **Version:** `1.0.0`  
-> **Latest Official Release:** [v1.0.0 GitHub Release](https://github.com/justinevans4040-cloud/speakeasy/releases/tag/v1.0.0)  
-> **Direct Package Download:** [SpeakEasy.by.ForgeFront.1.0.0.appx](https://github.com/justinevans4040-cloud/speakeasy/releases/download/v1.0.0/SpeakEasy.by.ForgeFront.1.0.0.appx)  
-> **Package Size:** `165,324,882` bytes  
-> **Package SHA-256:** `AD8877E4EF5B492092267AD7FCFF5BF763DC85C54059C1817C65F81A3F39E9E9`  
-> **Signing Status:** Unsigned (Windows Store pre-submission AppX container)  
+SpeakEasy by ForgeFront Systems is a private, on-device voice-to-text desktop application with a Prohibition-era black-and-gold interface.
 
----
+## Canonical source
 
-## Overview
+- Repository: `justinevans4040-cloud/speakeasy`
+- Canonical branch: `main`
+- Current application line: `1.1.x`
+- Microsoft Store product ID: `9NN1J22323MG`
+- Microsoft Store listing: https://apps.microsoft.com/detail/9NN1J22323MG
 
-SpeakEasy by ForgeFront is a premium, on-device voice-to-text dictation application featuring local Whisper speech recognition and Prohibition-era Art Deco workspace design.
+The repository is the authoritative source. Compiled packages are valid only when produced from the latest passing `main` workflow. Historical material remains under `archive/legacy/` for provenance and is not part of the active application or build.
 
-The application is structured into two canonical parts:
-1. **Web Core (`web/`):** Standard web application using HTML, CSS, JavaScript, AudioWorklet, and on-device WebAssembly Whisper models (`@xenova/transformers`).
-2. **Desktop Shell (`electron/`):** Hardened Electron container configured with origin permission enforcement (`requestingUrl.startsWith('file://')`) and `@electron/fuses`.
+There is no public package download declared here until a verified package is attached to the current official release or accepted by Microsoft. Do not distribute a package copied from an older commit, local folder, or archived path.
 
----
+## Active application
 
-## Repository Policy & Security Notices
+- `web/` — canonical HTML, CSS, JavaScript, AudioWorklet, local model runtime, and approved SpeakEasy artwork.
+- `electron/` — hardened Electron wrapper and Microsoft AppX configuration.
+- `.github/workflows/verify.yml` — Windows verification, AppX packaging, identity inspection, checksum generation, and build-artifact upload.
 
-- **Canonical Location:** This repository (`justinevans4040-cloud/speakeasy`) is the single authoritative source for SpeakEasy.
-- **Historical Material:** Legacy mobile scaffolds and previous release assets are archived strictly for provenance in `archive/legacy/` and are **not** active downloads.
-- **No Tracked Binaries or Secrets:** Keystores, passwords, and compiled output (`dist/`, `electron/dist/`, `electron/build/`) are strictly untracked.
+## Microsoft package identity
 
----
+| Manifest field | Required value |
+|---|---|
+| Package/Identity/Name | `ForgeFrontSystems.SpeakEasybyForgeFront` |
+| Package/Identity/Publisher | `CN=8E906094-1F36-496B-A889-858E25A1FCB3` |
+| Package/Properties/PublisherDisplayName | `ForgeFront Systems` |
+| Package family name | `ForgeFrontSystems.SpeakEasybyForgeFront_bx20qhkpd5t86` |
 
-## Development & Verification
+The repository verification and Windows workflow fail when the configured identity differs from these values.
 
-### Build Web Core
+## Build and verification
+
 ```bash
+npm ci
+npm --prefix electron ci
+npm run verify
 npm run build
-```
-
-### Stage Windows Desktop Shell
-```bash
-npm run stage:windows
-```
-
-### Build Official Microsoft AppX Package
-```bash
 npm run build:windows
 ```
 
-### Repository Integrity Check
-```bash
-npm run verify
-```
+`npm run build:windows` requires Windows. GitHub Actions produces a `SpeakEasy-Microsoft-Store-Candidate` artifact containing the AppX and its SHA-256 checksum. That artifact is a submission candidate, not proof of Microsoft certification. WACK and Partner Center submission remain release gates.

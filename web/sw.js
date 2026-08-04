@@ -1,11 +1,15 @@
-const CACHE_NAME = "speakeasy-app-v4";
+const CACHE_NAME = "speakeasy-app-v7";
 
 const ASSETS = [
   "./",
   "./index.html",
+  "./styles.css",
   "./app.js",
   "./manifest.webmanifest",
-  "./assets/wake-emblem-original.png",
+  "./assets/speakeasy-emblem.png",
+  "./assets/speakeasy-room-background.webp",
+  "./assets/icon-192.png",
+  "./assets/icon-512.png",
 ];
 
 self.addEventListener("install", (event) => {

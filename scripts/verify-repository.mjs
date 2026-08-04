@@ -7,12 +7,18 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const failures = [];
 const required = [
   "web/index.html",
+  "web/styles.css",
   "web/app.js",
   "web/manifest.webmanifest",
   "web/sw.js",
   "web/vendor/transformers/transformers.min.js",
   "electron/index.js",
   "electron/package.json",
+  "web/assets/speakeasy-emblem.png",
+  "web/assets/icon-192.png",
+  "web/assets/icon-512.png",
+  "web/assets/icon-maskable.png",
+  "web/assets/store-icon-300.png",
 ];
 
 for (const relative of required) {
@@ -50,6 +56,22 @@ if (existsSync(resolve(root, "web/index.html"))) {
   if (!html.includes("Content-Security-Policy")) failures.push("web/index.html has no Content Security Policy.");
   if (!html.includes("huggingface.co")) failures.push("CSP does not permit HuggingFace model downloads.");
   if (html.includes("landing.html")) failures.push("web/index.html still links to the obsolete marketing page.");
+  if (html.includes("wake-emblem-original")) failures.push("web/index.html still references the incorrect WAKE emblem.");
+  if (html.includes("style=\"")) failures.push("web/index.html contains inline styling instead of the canonical stylesheet.");
+}
+
+if (existsSync(resolve(root, "electron/package.json"))) {
+  const electronPackage = JSON.parse(readFileSync(resolve(root, "electron/package.json"), "utf8"));
+  const appx = electronPackage.build?.appx ?? {};
+  const expected = {
+    identityName: "ForgeFrontSystems.SpeakEasybyForgeFront",
+    publisher: "CN=8E906094-1F36-496B-A889-858E25A1FCB3",
+    publisherDisplayName: "ForgeFront Systems",
+    applicationId: "SpeakEasy",
+  };
+  for (const [key, value] of Object.entries(expected)) {
+    if (appx[key] !== value) failures.push(`Microsoft package identity mismatch for appx.${key}.`);
+  }
 }
 
 if (failures.length) {

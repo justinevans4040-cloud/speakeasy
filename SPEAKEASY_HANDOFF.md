@@ -1,57 +1,48 @@
-# SpeakEasy Session Handoff Document
+# SpeakEasy Handoff
 
-> **Repository Status:** CANONICAL  
-> **Current Branch:** `main`  
-> **Target Commit:** `27e30c8`  
-> **Application Version:** `1.0.0`  
-> **Verified Package:** `electron/build/SpeakEasy by ForgeFront 1.0.0.appx`  
-> **Package Length:** `165,324,882` bytes  
-> **Package Hash (SHA-256):** `AD8877E4EF5B492092267AD7FCFF5BF763DC85C54059C1817C65F81A3F39E9E9`  
-> **Signing Status:** Unsigned (Windows Store pre-submission AppX container)  
-> **Status:** All code corrections, fuse readbacks, dependency audits, and CI pipeline fixes complete. Manual hardware tests and WACK execution marked NOT TESTED.
+> **Repository:** `justinevans4040-cloud/speakeasy`
+> **Canonical destination:** `main`
+> **Application version:** `1.1.0`
+> **Microsoft package status:** Build pipeline configured; fresh Windows AppX artifact pending CI execution
+> **Certification status:** WACK and Partner Center submission not yet completed
 
----
+## What is now active
 
-## Deliverables Summary
+- Approved SpeakEasy black-and-gold microphone/fedora emblem with the small line `by ForgeFront Systems`.
+- Rebuilt responsive dictation workspace in `web/index.html` and `web/styles.css`.
+- Existing local dictation, editing, draft recovery, copy, TXT export, cache deletion, and keyboard shortcut behavior preserved in `web/app.js`.
+- Incorrect WAKE emblem and invalid PNG-disguised-as-ICO retained only under `archive/legacy/assets/`; neither is used by the active build.
+- Exact-size PWA and Microsoft package icon assets generated from `web/assets/speakeasy-emblem.png`.
+- Root dependency audit passes with zero known vulnerabilities.
+- Windows GitHub Actions workflow builds one AppX, validates its manifest identity, generates SHA-256, and uploads one named candidate artifact.
 
-- **Canonical Repository:** `https://github.com/justinevans4040-cloud/speakeasy`
-- **Execution Checklist:** `SPEAKEASY_EXECUTION_CHECKLIST.md`
-- **Legacy Historical Archive:** `archive/legacy/HISTORICAL_MANIFEST.md`
-- **Comprehensive Test Report:** `docs/TEST_REPORT.md`
-- **Store Listing Draft:** `docs/STORE_LISTING.md`
-- **Checksums File:** `checksums.sha256`
+## Microsoft Partner Center identity
 
----
+| Field | Value |
+|---|---|
+| Reserved product name | SpeakEasy by ForgeFront |
+| Store ID | `9NN1J22323MG` |
+| Package/Identity/Name | `ForgeFrontSystems.SpeakEasybyForgeFront` |
+| Package/Identity/Publisher | `CN=8E906094-1F36-496B-A889-858E25A1FCB3` |
+| Publisher display name | `ForgeFront Systems` |
+| Package family name | `ForgeFrontSystems.SpeakEasybyForgeFront_bx20qhkpd5t86` |
 
-## Microsoft Partner Center Identity Summary
+## Verified locally
 
-- **Reserved Product Name:** `SpeakEasy by ForgeFront`
-- **Store ID:** `9NN1J22323MG`
-- **Package Identity Name:** `ForgeFrontSystems.SpeakEasybyForgeFront`
-- **Publisher:** `CN=8E906094-1F36-496B-A889-858E25A1FCB3`
-- **Package Family Name:** `ForgeFrontSystems.SpeakEasybyForgeFront_bx20qhkpd5t86`
-- **Publisher Display Name:** `ForgeFront Systems`
-
----
-
-## Verification Commands
-
-Run automated structure & security verification:
 ```bash
+npm audit --audit-level=high
+npm run icons
 npm run verify
-```
-
-Build production web assets:
-```bash
 npm run build
-```
-
-Stage Windows application shell:
-```bash
 npm run stage:windows
 ```
 
-Build official Microsoft AppX Store package:
-```bash
-npm run build:windows
-```
+## Remaining release gates
+
+1. Run the Windows workflow and download `SpeakEasy-Microsoft-Store-Candidate`.
+2. Confirm `scripts/verify-appx.ps1` passes against the generated AppX.
+3. Install and complete all manual microphone, offline, draft, export, and display-scaling tests in `docs/TEST_REPORT.md`.
+4. Run the Windows App Certification Kit and retain its report.
+5. Submit the verified AppX through Partner Center. Submission has not been performed by this work.
+
+No older package should be linked or described as current. The old 1.0.0 checksum is preserved under `archive/legacy/` only.
