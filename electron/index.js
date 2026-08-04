@@ -1,7 +1,12 @@
 const { app, BrowserWindow, shell, session } = require('electron');
 const path = require('path');
+const fs = require('fs');
 
 function createWindow() {
+  const iconPath = fs.existsSync(path.join(__dirname, 'dist', 'assets', 'icon-512.png'))
+    ? path.join(__dirname, 'dist', 'assets', 'icon-512.png')
+    : path.join(__dirname, '..', 'web', 'assets', 'icon-512.png');
+
   const win = new BrowserWindow({
     width: 1200,
     height: 800,
@@ -9,7 +14,7 @@ function createWindow() {
     minHeight: 600,
     backgroundColor: '#0a0b0d',
     show: false,
-    icon: path.join(__dirname, '..', 'web', 'assets', 'icon-512.png'),
+    icon: iconPath,
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
@@ -43,13 +48,22 @@ function createWindow() {
     win.show();
   });
 
-  win.loadFile(path.join(__dirname, '..', 'dist', 'index.html'));
+  // Item 1 Fix: Load packaged electron/dist/index.html with fallback for local dev
+  const targetPath = fs.existsSync(path.join(__dirname, 'dist', 'index.html'))
+    ? path.join(__dirname, 'dist', 'index.html')
+    : path.join(__dirname, '..', 'dist', 'index.html');
+
+  win.loadFile(targetPath);
 }
 
 app.whenReady().then(() => {
-  // Security: Restrict microphone permissions to local application origin
+  // Item 3 Fix: Restrict media permission strictly to the local application origin (file://)
   session.defaultSession.setPermissionRequestHandler((webContents, permission, callback) => {
-    if (permission === 'media') {
+    if (!webContents) {
+      return callback(false);
+    }
+    const requestingUrl = webContents.getURL();
+    if (permission === 'media' && requestingUrl && requestingUrl.startsWith('file://')) {
       callback(true);
     } else {
       callback(false);

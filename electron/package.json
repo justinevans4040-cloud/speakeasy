@@ -5,7 +5,8 @@
   "description": "SpeakEasy by ForgeFront voice-to-text desktop application",
   "main": "index.js",
   "scripts": {
-    "dist": "electron-builder --win appx"
+    "dist": "electron-builder --win appx",
+    "fuses": "node scripts/apply-fuses.js"
   },
   "build": {
     "appId": "ForgeFrontSystems.SpeakEasybyForgeFront",
@@ -17,6 +18,7 @@
       "index.js",
       "dist/**/*"
     ],
+    "afterPack": "./scripts/apply-fuses.js",
     "win": {
       "target": [
         "appx"
@@ -34,7 +36,8 @@
     }
   },
   "devDependencies": {
-    "electron": "^34.0.0",
+    "@electron/fuses": "^1.8.0",
+    "electron": "^43.2.0",
     "electron-builder": "^26.15.3"
   }
 }

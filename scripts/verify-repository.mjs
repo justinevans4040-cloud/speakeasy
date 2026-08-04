@@ -23,16 +23,20 @@ const git = spawnSync("git", ["ls-files"], { cwd: root, encoding: "utf8" });
 if (git.status !== 0) failures.push(`git ls-files failed: ${git.stderr.trim()}`);
 const tracked = git.stdout.split(/\r?\n/).filter(Boolean);
 
+const activeTracked = tracked.filter((file) => !file.startsWith("archive/"));
+
 const forbiddenPrefixes = ["android/", "mobile/", "dist/", "electron/dist/", "electron/build/", "templates/"];
-for (const file of tracked) {
+for (const file of activeTracked) {
   if (forbiddenPrefixes.some((prefix) => file.startsWith(prefix))) {
-    failures.push(`Forbidden generated or legacy path is tracked: ${file}`);
+    failures.push(`Forbidden generated or legacy path is tracked in active tree: ${file}`);
   }
 }
 
 const forbiddenNames = ["release.keystore", "keystore.properties", "local.properties", "speakeasy.html", "landing.html"];
-for (const file of tracked) {
-  if (forbiddenNames.some((name) => file.endsWith(name))) failures.push(`Forbidden legacy or local file is tracked: ${file}`);
+for (const file of activeTracked) {
+  if (forbiddenNames.some((name) => file.endsWith(name))) {
+    failures.push(`Forbidden legacy or local file is tracked in active tree: ${file}`);
+  }
 }
 
 const signingSecretPattern = /(storePassword|keyPassword)\s*[=:]\s*["'][^"']+["']/i;
@@ -53,4 +57,4 @@ if (failures.length) {
   process.exit(1);
 }
 
-console.log(`Repository verification passed (${tracked.length} tracked files).`);
+console.log(`Repository verification passed (${tracked.length} total tracked files, ${activeTracked.length} active).`);

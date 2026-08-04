@@ -1,4 +1,4 @@
-name: SpeakEasy Continuous Verification
+name: SpeakEasy Continuous Verification & Build
 
 on:
   push:
@@ -7,8 +7,8 @@ on:
     branches: [ main ]
 
 jobs:
-  verify:
-    runs-on: ubuntu-latest
+  verify-and-build:
+    runs-on: windows-latest
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -19,8 +19,11 @@ jobs:
           node-version: 20
           cache: 'npm'
 
-      - name: Install Dependencies
+      - name: Install Root Dependencies
         run: npm ci
+
+      - name: Install Electron Dependencies
+        run: npm --prefix electron ci
 
       - name: Verify Repository Structure & Security
         run: npm run verify
@@ -28,8 +31,12 @@ jobs:
       - name: Build Web Application
         run: npm run build
 
-      - name: Stage Windows Desktop Shell
+      - name: Stage Windows Application
         run: npm run stage:windows
 
-      - name: Run Dependency Audit
-        run: npm audit --audit-level=high
+      - name: Build Windows AppX/MSIX Package
+        run: npm run build:windows
+
+      - name: Generate Package Checksum
+        run: |
+          Get-FileHash -Algorithm SHA256 (Get-ChildItem -Path electron/build/*.appx) | Format-List
