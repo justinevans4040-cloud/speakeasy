@@ -2,11 +2,13 @@
 
 > **Repository Status:** CANONICAL  
 > **Current Branch:** `main`  
-> **Current Commit:** `ffbaf41`  
+> **Target Commit:** `27e30c8`  
 > **Version:** `1.0.0`  
-> **Package Output:** `electron/build/SpeakEasy by ForgeFront 1.0.0.appx`  
-> **Package SHA-256:** `592DD0C4B49C8A9DEAFAA8A50AA60BE853047EEFFFC9FF9A96FD65A4C2D9529B`  
-> **Store Readiness:** Verified Microsoft AppX package with exact Partner Center identity.
+> **Latest Official Release:** [v1.0.0 GitHub Release](https://github.com/justinevans4040-cloud/speakeasy/releases/tag/v1.0.0)  
+> **Direct Package Download:** [SpeakEasy.by.ForgeFront.1.0.0.appx](https://github.com/justinevans4040-cloud/speakeasy/releases/download/v1.0.0/SpeakEasy.by.ForgeFront.1.0.0.appx)  
+> **Package Size:** `165,324,882` bytes  
+> **Package SHA-256:** `AD8877E4EF5B492092267AD7FCFF5BF763DC85C54059C1817C65F81A3F39E9E9`  
+> **Signing Status:** Unsigned (Windows Store pre-submission AppX container)  
 
 ---
 
@@ -16,7 +18,7 @@ SpeakEasy by ForgeFront is a premium, on-device voice-to-text dictation applicat
 
 The application is structured into two canonical parts:
 1. **Web Core (`web/`):** Standard web application using HTML, CSS, JavaScript, AudioWorklet, and on-device WebAssembly Whisper models (`@xenova/transformers`).
-2. **Desktop Shell (`electron/`):** Hardened Electron container configured with origin permission enforcement and `@electron/fuses`.
+2. **Desktop Shell (`electron/`):** Hardened Electron container configured with origin permission enforcement (`requestingUrl.startsWith('file://')`) and `@electron/fuses`.
 
 ---
 
@@ -40,7 +42,7 @@ npm run build
 npm run stage:windows
 ```
 
-### Build Official Microsoft AppX/MSIX Package
+### Build Official Microsoft AppX Package
 ```bash
 npm run build:windows
 ```

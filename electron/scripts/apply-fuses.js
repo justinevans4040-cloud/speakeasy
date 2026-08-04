@@ -1,4 +1,4 @@
-const { flipFuses, FuseVersion, FuseV1Options } = require('@electron/fuses');
+const { flipFuses, getCurrentFuseWire, FuseVersion, FuseV1Options } = require('@electron/fuses');
 const path = require('path');
 const fs = require('fs');
 
@@ -16,10 +16,19 @@ module.exports = async function (context) {
     version: FuseVersion.V1,
     [FuseV1Options.RunAsNode]: false,
     [FuseV1Options.EnableNodeOptionsEnvironmentVariable]: false,
-    [FuseV1Options.EnableNodeCliInspect]: false,
+    [FuseV1Options.EnableNodeCliInspectArguments]: false,
     [FuseV1Options.EnableEmbeddedAsarIntegrityValidation]: true,
     [FuseV1Options.OnlyLoadAppFromAsar]: true,
   });
 
-  console.log('Electron security fuses applied and verified successfully!');
+  console.log('Verifying fuse wire state on built executable...');
+  const fusesState = await getCurrentFuseWire(exePath);
+  console.log('Packaged Executable Fuse Readback State:\n', JSON.stringify({
+    RunAsNode: fusesState['0'] === 48 ? 'Disabled (0)' : 'Enabled (1)',
+    EnableNodeOptionsEnvironmentVariable: fusesState['2'] === 48 ? 'Disabled (0)' : 'Enabled (1)',
+    EnableNodeCliInspectArguments: fusesState['3'] === 48 ? 'Disabled (0)' : 'Enabled (1)',
+    EnableEmbeddedAsarIntegrityValidation: fusesState['4'] === 49 ? 'Enabled (1)' : 'Disabled (0)',
+    OnlyLoadAppFromAsar: fusesState['5'] === 49 ? 'Enabled (1)' : 'Disabled (0)',
+    rawFuseWire: fusesState
+  }, null, 2));
 };

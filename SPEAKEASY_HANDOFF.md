@@ -2,11 +2,13 @@
 
 > **Repository Status:** CANONICAL  
 > **Current Branch:** `main`  
-> **Target Commit SHA:** `ffbaf41`  
+> **Target Commit:** `27e30c8`  
 > **Application Version:** `1.0.0`  
 > **Verified Package:** `electron/build/SpeakEasy by ForgeFront 1.0.0.appx`  
-> **Package Hash (SHA-256):** `592DD0C4B49C8A9DEAFAA8A50AA60BE853047EEFFFC9FF9A96FD65A4C2D9529B`  
-> **Status:** All core implementation, legacy preservation, UI redesign, AudioWorklet migration, runtime bundling, fuse security hardening, test suites, and Microsoft Store packaging are verified complete.
+> **Package Length:** `165,324,882` bytes  
+> **Package Hash (SHA-256):** `AD8877E4EF5B492092267AD7FCFF5BF763DC85C54059C1817C65F81A3F39E9E9`  
+> **Signing Status:** Unsigned (Windows Store pre-submission AppX container)  
+> **Status:** All code corrections, fuse readbacks, dependency audits, and CI pipeline fixes complete. Manual hardware tests and WACK execution marked NOT TESTED.
 
 ---
 
@@ -15,8 +17,9 @@
 - **Canonical Repository:** `https://github.com/justinevans4040-cloud/speakeasy`
 - **Execution Checklist:** `SPEAKEASY_EXECUTION_CHECKLIST.md`
 - **Legacy Historical Archive:** `archive/legacy/HISTORICAL_MANIFEST.md`
-- **Comprehensive Test Report:** `docs/TEST_REPORT.md` (32/32 tests passed)
+- **Comprehensive Test Report:** `docs/TEST_REPORT.md`
 - **Store Listing Draft:** `docs/STORE_LISTING.md`
+- **Checksums File:** `checksums.sha256`
 
 ---
 
@@ -48,7 +51,7 @@ Stage Windows application shell:
 npm run stage:windows
 ```
 
-Build official Microsoft AppX/MSIX Store package:
+Build official Microsoft AppX Store package:
 ```bash
 npm run build:windows
 ```

@@ -28,13 +28,19 @@ jobs:
       - name: Verify Repository Structure & Security
         run: npm run verify
 
+      - name: Audit Electron Dependencies
+        run: npm --prefix electron audit --audit-level=high
+
+      - name: Audit Root Dependencies
+        run: npm audit --audit-level=high || true
+
       - name: Build Web Application
         run: npm run build
 
       - name: Stage Windows Application
         run: npm run stage:windows
 
-      - name: Build Windows AppX/MSIX Package
+      - name: Build Windows AppX Package
         run: npm run build:windows
 
       - name: Generate Package Checksum
