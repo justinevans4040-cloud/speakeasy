@@ -1,10 +1,9 @@
-const CACHE_NAME = "speakeasy-app-v3";
+const CACHE_NAME = "speakeasy-app-v4";
 
 const ASSETS = [
   "./",
   "./index.html",
   "./app.js",
-  "./landing.html",
   "./manifest.webmanifest",
   "./assets/wake-emblem-original.png",
 ];
@@ -44,7 +43,11 @@ self.addEventListener("fetch", (event) => {
           }
           return res;
         })
-        .catch(() => cached);
+        .catch(() => {
+          if (cached) return cached;
+          if (request.mode === "navigate") return caches.match("./index.html");
+          return Response.error();
+        });
     }),
   );
 });

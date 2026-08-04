@@ -9,17 +9,18 @@
       "index.js",
       "dist/**/*"
     ],
-    "appId": "com.wakecodex.speakeasy",
-    "productName": "speakeasy",
+    "appId": "com.forgefront.speakeasy",
+    "productName": "SpeakEasy",
     "directories": {
       "output": "build"
     }
   },
   "name": "speakeasy",
-  "version": "1.0.0",
+  "version": "0.1.0",
+  "description": "SpeakEasy voice-to-text desktop application",
   "main": "index.js",
   "scripts": {
-    "dist": "electron-builder -w"
+    "dist": "electron-builder --win nsis"
   },
   "devDependencies": {
     "electron": "^43.2.0",

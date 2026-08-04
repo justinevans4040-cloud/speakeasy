@@ -1,7 +1,0 @@
-<?xml version='1.0' encoding='utf-8'?>
-<resources>
-    <string name="app_name">SpeakEasy</string>
-    <string name="title_activity_main">SpeakEasy</string>
-    <string name="package_name">com.wakeforged.speakeasy</string>
-    <string name="custom_url_scheme">com.wakeforged.speakeasy</string>
-</resources>

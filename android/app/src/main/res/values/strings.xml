@@ -1,7 +1,0 @@
-<?xml version='1.0' encoding='utf-8'?>
-<resources>
-    <string name="app_name">speakeasy</string>
-    <string name="title_activity_main">speakeasy</string>
-    <string name="package_name">com.wakecodex.speakeasy</string>
-    <string name="custom_url_scheme">com.wakecodex.speakeasy</string>
-</resources>

@@ -1,10 +1,15 @@
 {
+  "name": "speakeasy",
+  "version": "0.1.0",
+  "private": true,
+  "description": "SpeakEasy voice-to-text application",
   "scripts": {
-    "build": "if not exist dist mkdir dist && xcopy web\\* dist\\ /s /e /y && move /y dist\\speakeasy.html dist\\index.html"
+    "build": "node scripts/build-web.mjs",
+    "stage:windows": "node scripts/stage-windows.mjs",
+    "build:windows": "npm run stage:windows && npm --prefix electron run dist",
+    "verify": "node scripts/verify-repository.mjs"
   },
-  "dependencies": {
-    "@capacitor/android": "^8.5.0",
-    "@capacitor/cli": "^8.5.0",
-    "@capacitor/core": "^8.5.0"
+  "engines": {
+    "node": ">=20"
   }
 }
