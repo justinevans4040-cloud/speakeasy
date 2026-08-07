@@ -1,0 +1,122 @@
+name: SpeakEasy Android / Uptodown
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'web/**'
+      - 'scripts/**'
+      - 'capacitor.config.json'
+      - '.github/workflows/android-uptodown.yml'
+  push:
+    branches:
+      - 'agent/android-uptodown-deploy'
+
+jobs:
+  build-android:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install SpeakEasy dependencies
+        run: npm ci
+
+      - name: Install pinned Android packaging tools
+        run: npm install --no-save @capacitor/core@8 @capacitor/cli@8 @capacitor/android@8
+
+      - name: Verify canonical source
+        run: npm run verify
+
+      - name: Build canonical web application
+        run: npm run build
+
+      - name: Generate Android project
+        run: npx cap add android
+
+      - name: Configure Android permissions
+        run: node scripts/configure-android.mjs
+
+      - name: Sync Android assets
+        run: npx cap sync android
+
+      - name: Build debug APK
+        working-directory: android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug
+
+      - name: Build release APK
+        working-directory: android
+        run: ./gradlew assembleRelease
+
+      - name: Upload test APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: SpeakEasy-Android-Test-APK
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Prepare Uptodown signing key
+        if: ${{ secrets.UPTODOWN_KEYSTORE_BASE64 != '' }}
+        shell: bash
+        env:
+          UPTODOWN_KEYSTORE_BASE64: ${{ secrets.UPTODOWN_KEYSTORE_BASE64 }}
+        run: |
+          printf '%s' "$UPTODOWN_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/speakeasy-uptodown.jks"
+
+      - name: Sign Uptodown release APK
+        if: ${{ secrets.UPTODOWN_KEYSTORE_BASE64 != '' }}
+        shell: bash
+        env:
+          STORE_PASSWORD: ${{ secrets.UPTODOWN_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.UPTODOWN_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.UPTODOWN_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          UNSIGNED="android/app/build/outputs/apk/release/app-release-unsigned.apk"
+          OUTDIR="$RUNNER_TEMP/uptodown"
+          mkdir -p "$OUTDIR"
+
+          BUILD_TOOLS="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -1)"
+          "$BUILD_TOOLS/zipalign" -f -p 4 "$UNSIGNED" "$OUTDIR/SpeakEasy-1.2.0-uptodown-aligned.apk"
+          "$BUILD_TOOLS/apksigner" sign \
+            --ks "$RUNNER_TEMP/speakeasy-uptodown.jks" \
+            --ks-key-alias "$KEY_ALIAS" \
+            --ks-pass "pass:$STORE_PASSWORD" \
+            --key-pass "pass:$KEY_PASSWORD" \
+            --out "$OUTDIR/SpeakEasy-1.2.0-Uptodown.apk" \
+            "$OUTDIR/SpeakEasy-1.2.0-uptodown-aligned.apk"
+          "$BUILD_TOOLS/apksigner" verify --verbose --print-certs "$OUTDIR/SpeakEasy-1.2.0-Uptodown.apk"
+          sha256sum "$OUTDIR/SpeakEasy-1.2.0-Uptodown.apk" > "$OUTDIR/SpeakEasy-1.2.0-Uptodown.apk.sha256"
+
+      - name: Upload signed Uptodown APK
+        if: ${{ secrets.UPTODOWN_KEYSTORE_BASE64 != '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: SpeakEasy-Uptodown-Release
+          path: |
+            ${{ runner.temp }}/uptodown/SpeakEasy-1.2.0-Uptodown.apk
+            ${{ runner.temp }}/uptodown/SpeakEasy-1.2.0-Uptodown.apk.sha256
+          if-no-files-found: error
+          retention-days: 30
