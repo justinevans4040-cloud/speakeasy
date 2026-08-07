@@ -1,0 +1,181 @@
+name: SpeakEasy Android / Uptodown
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'web/**'
+      - 'scripts/**'
+      - 'capacitor.config.json'
+      - '.github/workflows/android-uptodown.yml'
+  push:
+    branches:
+      - 'agent/android-uptodown-deploy'
+    paths:
+      - 'web/**'
+      - 'scripts/**'
+      - 'capacitor.config.json'
+      - '.github/workflows/android-uptodown.yml'
+      - 'UPTODOWN_ANDROID_SUBMISSION.md'
+
+concurrency:
+  group: speakeasy-android-uptodown-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-android:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: write
+    env:
+      UPTODOWN_KEYSTORE_BASE64: ${{ secrets.UPTODOWN_KEYSTORE_BASE64 }}
+      UPTODOWN_KEYSTORE_PASSWORD: ${{ secrets.UPTODOWN_KEYSTORE_PASSWORD }}
+      UPTODOWN_KEY_ALIAS: ${{ secrets.UPTODOWN_KEY_ALIAS }}
+      UPTODOWN_KEY_PASSWORD: ${{ secrets.UPTODOWN_KEY_PASSWORD }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Report Android build start to PR
+        if: github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          BODY="Android build status: STARTED\n\nBuilding the fully unlocked test APK and canonical release APK.\nRun: https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          gh api "repos/${GITHUB_REPOSITORY}/issues/1/comments" -f body="$BODY"
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install SpeakEasy dependencies
+        run: npm ci
+
+      - name: Install pinned Android packaging tools
+        run: npm install --no-save @capacitor/core@8 @capacitor/cli@8 @capacitor/android@8
+
+      - name: Verify canonical source
+        run: npm run verify
+
+      - name: Build canonical web application
+        run: npm run build
+
+      - name: Generate Android project
+        run: npx cap add android
+
+      - name: Configure Android permissions
+        run: node scripts/configure-android.mjs
+
+      - name: Prepare fully unlocked Android test build
+        run: node scripts/prepare-android-debug.mjs
+
+      - name: Sync Android test assets
+        run: npx cap sync android
+
+      - name: Build debug APK
+        working-directory: android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug
+
+      - name: Upload test APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: SpeakEasy-Android-Test-APK
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Restore canonical release web application
+        run: npm run build
+
+      - name: Sync canonical release assets
+        run: npx cap sync android
+
+      - name: Build unsigned release APK
+        working-directory: android
+        run: ./gradlew assembleRelease
+
+      - name: Detect Uptodown signing key
+        id: signing
+        shell: bash
+        run: |
+          if [ -n "$UPTODOWN_KEYSTORE_BASE64" ] && [ -n "$UPTODOWN_KEYSTORE_PASSWORD" ] && [ -n "$UPTODOWN_KEY_ALIAS" ] && [ -n "$UPTODOWN_KEY_PASSWORD" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Prepare Uptodown signing key
+        if: steps.signing.outputs.enabled == 'true'
+        shell: bash
+        run: |
+          printf '%s' "$UPTODOWN_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/speakeasy-uptodown.jks"
+
+      - name: Sign Uptodown release APK
+        if: steps.signing.outputs.enabled == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          UNSIGNED="android/app/build/outputs/apk/release/app-release-unsigned.apk"
+          OUTDIR="$RUNNER_TEMP/uptodown"
+          mkdir -p "$OUTDIR"
+
+          BUILD_TOOLS="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -1)"
+          "$BUILD_TOOLS/zipalign" -f -p 4 "$UNSIGNED" "$OUTDIR/SpeakEasy-1.2.0-uptodown-aligned.apk"
+          "$BUILD_TOOLS/apksigner" sign \
+            --ks "$RUNNER_TEMP/speakeasy-uptodown.jks" \
+            --ks-key-alias "$UPTODOWN_KEY_ALIAS" \
+            --ks-pass "pass:$UPTODOWN_KEYSTORE_PASSWORD" \
+            --key-pass "pass:$UPTODOWN_KEY_PASSWORD" \
+            --out "$OUTDIR/SpeakEasy-1.2.0-Uptodown.apk" \
+            "$OUTDIR/SpeakEasy-1.2.0-uptodown-aligned.apk"
+          "$BUILD_TOOLS/apksigner" verify --verbose --print-certs "$OUTDIR/SpeakEasy-1.2.0-Uptodown.apk"
+          sha256sum "$OUTDIR/SpeakEasy-1.2.0-Uptodown.apk" > "$OUTDIR/SpeakEasy-1.2.0-Uptodown.apk.sha256"
+
+      - name: Upload signed Uptodown APK
+        if: steps.signing.outputs.enabled == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: SpeakEasy-Uptodown-Release
+          path: |
+            ${{ runner.temp }}/uptodown/SpeakEasy-1.2.0-Uptodown.apk
+            ${{ runner.temp }}/uptodown/SpeakEasy-1.2.0-Uptodown.apk.sha256
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Report Android build to PR
+        if: always() && github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          JOB_STATUS: ${{ job.status }}
+          SIGNING_ENABLED: ${{ steps.signing.outputs.enabled }}
+        shell: bash
+        run: |
+          if [ "$JOB_STATUS" = "success" ]; then
+            if [ "$SIGNING_ENABLED" = "true" ]; then
+              SIGNING_LINE="Signed Uptodown release APK: produced and verified."
+            else
+              SIGNING_LINE="Signed Uptodown release APK: waiting for permanent signing secrets."
+            fi
+            BODY="Android build status: SUCCESS\n\n- Fully unlocked test APK: produced as \`SpeakEasy-Android-Test-APK\`\n- Unsigned release APK: built from canonical release source\n- $SIGNING_LINE\n- Run: https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          else
+            BODY="Android build status: FAILURE\n\nThe Android workflow failed. Inspect the run logs here: https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          fi
+          gh api "repos/${GITHUB_REPOSITORY}/issues/1/comments" -f body="$BODY"
