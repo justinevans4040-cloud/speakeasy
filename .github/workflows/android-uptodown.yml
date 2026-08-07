@@ -19,6 +19,10 @@ on:
       - '.github/workflows/android-uptodown.yml'
       - 'UPTODOWN_ANDROID_SUBMISSION.md'
 
+concurrency:
+  group: speakeasy-android-uptodown-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build-android:
     runs-on: ubuntu-latest
@@ -35,6 +39,15 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Report Android build start to PR
+        if: github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          BODY="Android build status: STARTED\n\nBuilding the fully unlocked test APK and canonical release APK.\nRun: https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          gh api "repos/${GITHUB_REPOSITORY}/issues/1/comments" -f body="$BODY"
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
